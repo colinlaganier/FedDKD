@@ -1,15 +1,15 @@
 import torch
 import argparse
-import models.models as models
+from models.models import Models
 
-def main():
+def main(args):
     print("Hello world!")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-path", type=str, required=True)
     parser.add_argument("--results-dir", type=str, default="results")
-    parser.add_argument("--model", type=str, choices=list(models.available.keys()), default="resnet32")
+    parser.add_argument("--model", type=str, choices=list(Models.available.keys()), default="resnet32")
     parser.add_argument("--image-size", type=int, choices=[256, 512], default=256)
     parser.add_argument("--num-classes", type=int, default=1000)
     parser.add_argument("--epochs", type=int, default=1400)

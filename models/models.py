@@ -1,5 +1,5 @@
 import torch
-import lenet, resnet, mobilenet, vgg
+from models import lenet, resnet, mobilenet, vgg
 
 class Models:
 
