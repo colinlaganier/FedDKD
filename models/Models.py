@@ -32,4 +32,5 @@ class Models:
                  "resnet18" : ResNet18,
                  "mobilenetv3" : MobileNetV3,
                  "vgg" : VGG}    
+    
 
