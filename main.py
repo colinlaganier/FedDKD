@@ -27,6 +27,9 @@ def main(args):
         clients[client_id].set_data(dataset.client_dataloaders[client_id])
         clients[client_id].set_model(client_models[client_id])
 
+        if args.load_diffusion:
+            clients[client_id].get_diffusion()
+
     # Create server
     server = Server(args.server_model)
 

@@ -30,6 +30,12 @@ class Client:
         self.model = self.model()
 
     def set_dataset(self, dataset):
+        """
+        Set the dataset for the client model
+
+        Args:
+            dataset (torch.utils.data.DataLoader): dataset to set the model to
+        """
         self.dataloader = dataset
 
     def init_diffusion(self):
