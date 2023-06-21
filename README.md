@@ -69,3 +69,5 @@ parser.add_argument("--dataset-id", type=str, choices=["cifar10", "cifar100"], d
 * [Federated learning by employing knowledge distillation on edge devices with limited hardware resources](https://doi.org/10.1016/j.neucom.2023.02.011)
 * [Is Synthetic Data From Diffusion Models Ready for Knowledge Distillation?](https://arxiv.org/abs/2305.12954)
 * [Deep Learning with Differential Privacy](https://arxiv.org/abs/1607.00133)
+
+<!-- The proposed implementation is a data-free method building upon: Tanghatari, Ehsan & Kamal, Mehdi & Afzali-Kusha, Ali & Pedram, Massoud. (2023). Federated Learning by Employing Knowledge Distillation on Edge Devices with Limited Hardware Resources. Neurocomputing. 531. 10.1016/j.neucom.2023.02.011. -->
