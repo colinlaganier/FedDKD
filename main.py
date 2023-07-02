@@ -34,8 +34,7 @@ def main(args):
     server = Server(args.server_model)
 
     # Create scheduler
-    scheduler = Scheduler(clients, server, num_devices)
-    scheduler.assign_devices()
+    scheduler = Scheduler(args.num_clients, )
 
     # scheduler.init_diffusion(args.load_diffusion)
     # scheduler.init_clients()

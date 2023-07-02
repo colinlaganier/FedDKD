@@ -14,6 +14,7 @@ class Dataset:
         self.equal_split = True
         self.client_dataloaders = []
         self.test_dataloader = None
+        self.diffusion
 
         # Dataset transforms
         self.mean, self.std = self.get_stats(dataset_id)
@@ -28,6 +29,10 @@ class Dataset:
             transforms.Resize((32,32)),
             transforms.ToTensor(),
             transforms.Normalize(mean=self.mean, std=self.std),
+        ])
+        self.diffusion_transform = transforms.Compose([
+            transforms.Resize((32,32)),
+            transforms.ToTensor()
         ])
 
     def get_stats(self, dataset_id):
@@ -75,3 +80,9 @@ class Dataset:
         # Create test dataloader
         self.test_dataloader = DataLoader(test_data, batch_size=self.batch_size, shuffle=True)
 
+    def prepare_diffusion_data(self):
+        """
+        Loads data from data_path and splits into client dataloader
+        """
+        diffusion_data = ImageFolder(self.data_path + "/diffusion", transform=self.diffusion_transform)
+        self.diffusion_dataloader = DataLoader(diffusion_data, batch_size=self.batch_size, shuffle=True)

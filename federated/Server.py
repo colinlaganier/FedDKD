@@ -3,12 +3,12 @@ from queue import Queue
 
 class Server:
     
-    def __init__(self, model):
+    def __init__(self, device, model, optimizer):
+        self.device = None
         self.model = model
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9)
+        self.optimizer = optimizer(self.model.parameters(), lr=0.01, momentum=0.9)
         self.diffusion_model = None
         self.diffusion_seed = None
-        self.device = None
         self.queue = Queue() # logits stored on cpu
         self.busy = False
 

@@ -13,7 +13,7 @@ Federated learning (FL) is a distributed machine learning paradigm that enables 
 Install all the packages from environment.yml file using conda:
 
 ```
-conda env create -f environment.yml
+conda env create -f environment.yaml
 ```
 
 
