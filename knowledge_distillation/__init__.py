@@ -7,7 +7,6 @@ from .pkt import PKTCosSim
 from .fsp import FSP
 from .ft import FT
 from .dml import DML
-from .kdsvd import KDSVD
 from .rkd import RKD
 from .ab import AB
 from .sp import SP

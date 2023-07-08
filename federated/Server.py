@@ -1,5 +1,4 @@
 import torch
-from queue import Queue
 
 class Server:
     
@@ -9,7 +8,7 @@ class Server:
         self.optimizer = optimizer(self.model.parameters(), lr=0.01, momentum=0.9)
         self.diffusion_model = None
         self.diffusion_seed = None
-        self.queue = Queue() # logits stored on cpu
+        # self.queue = Queue() # logits stored on cpu
         self.busy = False
 
     def generate_diffusion_seed(self):
@@ -27,13 +26,13 @@ class Server:
     def send_logits(self, device):
         pass
 
-    def get_logits(self, logits, device):
-        if not self.busy:
-            if self.queue.empty():
-                self.busy = True
-                self.queue.put((logits, device))
+    # def get_logits(self, logits, device):
+    #     if not self.busy:
+    #         if self.queue.empty():
+    #             self.busy = True
+    #             self.queue.put((logits, device))
 
-                return None
-        if self.busy:
-            self.queue.put((logits, device))
+    #             return None
+    #     if self.busy:
+    #         self.queue.put((logits, device))
          

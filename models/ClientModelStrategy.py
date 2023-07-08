@@ -17,7 +17,7 @@ class ClientModelStrategy:
     
     @staticmethod
     def strategy_1(num_clients):
-        return [Models.ResNet18] * (num_clients // 2) + [Models.ResNet32] * (num_clients - (num_clients // 2))
+        return [Models.ResNet18] * (num_clients // 2) + [Models.ResNet34] * (num_clients - (num_clients // 2))
     
     @staticmethod
     def strategy_2(num_clients):

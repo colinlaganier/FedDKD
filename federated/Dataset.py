@@ -1,25 +1,27 @@
+import numpy as np
 import torch
 from torchvision import transforms
 from torchvision.transforms import ToTensor
 from torchvision.datasets import ImageFolder
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Subset, random_split
 
 class Dataset:
 
-    def __init__(self, data_path, dataset_id, image_size, batch_size, num_clients):
+    def __init__(self, data_path, dataset_id, batch_size, num_clients):
         self.data_path = data_path
-        self.image_size = image_size
         self.num_clients = num_clients
         self.batch_size = batch_size
+        self.kd_batch_size = kd_batch_size
         self.equal_split = True
         self.client_dataloaders = []
         self.test_dataloader = None
-        self.diffusion
+        self.num_classes = 10 if (dataset_id == "cifar10") else 100
+        # self.diffusion
 
         # Dataset transforms
         self.mean, self.std = self.get_stats(dataset_id)
         self.train_transform = transforms.Compose([
-            transforms.Resize((32,32)),
+            # transforms.Resize((32,32)),
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
@@ -51,26 +53,106 @@ class Dataset:
             return [0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]
         
         
-    def split_data(self, training_data):
+    def random_split(self, dataset):
         """
         Splits training data into client datasets based on num_clients and splitting strategy
         
         Args:
-            training_data (torch.utils.data.Dataset): training data
-        Returns:
+            dataset (torch.utils.data.Dataset): training data
+        Returns:s
             client_data (list): list of client datasets
         """
         if self.equal_split:
-            return random_split(training_data, [len(training_data) // self.num_clients] * self.num_clients)
+            return random_split(dataset, [len(dataset) // self.num_clients] * self.num_clients)
+        
+    def balanced_split(self, dataset):
+        """
+        Splits training data into client datasets with balanced classes
+        
+        Args:
+            dataset (torch.utils.data.Dataset): training data
+        Returns:
+            client_data (list): list of client datasets
+        """
+        samples_per_class = len(dataset) // self.num_clients
+        remainder = len(dataset) % self.num_clients
+
+        class_counts = [0] * self.num_classes # number of samples per class
+        subset_indices = [[] for _ in range(self.num_clients)] # indices of samples per subset
+        for i, (data, target) in enumerate(dataset):
+            # Add sample to subset if number of samples per class is less than samples_per_class
+            if class_counts[target] < samples_per_class:
+                subset_indices[i % self.num_clients].append(i)
+                class_counts[target] += 1
+            elif remainder > 0:
+                subset_indices[i % self.num_clients].append(i)
+                class_counts[target] += 1
+                remainder -= 1
+
+        # Create Subset objects for each subset
+        subsets = [Subset(dataset, indices) for indices in subset_indices]
+
+        return subsets
+        
+
+    def dirichlet_split(self, dataset, beta=0.1):
+        """
+        Splits training data into client datasets based Dirichlet distribution
+
+        Args:
+            dataset (torch.utils.data.Dataset): training data
+            beta (float): concentration parameter of Dirichlet distribution
+        Returns:
+            client_data (list): list of client datasets       
+        """
+
+        label_distributions = []
+        # Generate label distributions for each class using Dirichlet distribution
+        for y in range(len(dataset.classes)):
+            label_distributions.append(np.random.dirichlet(np.repeat(beta, self.num_clients)))
+
+        labels = np.array(dataset.targets).astype(int)
+        client_idx_map = {i: {} for i in range(self.num_clients)}
+        client_size_map = {i: {} for i in range(self.num_clients)}
+
+        for y in range(len(dataset.classes)):
+            label_y_idx = np.where(labels == y)[0]
+            label_y_size = len(label_y_idx)
+
+            # Sample number of samples for each client from label distribution
+            sample_size = (label_distributions[y] * label_y_size).astype(int)
+            sample_size[self.num_clients - 1] += len(label_y_idx) - np.sum(sample_size)
+            for i in range(self.num_clients):
+                client_size_map[i][y] = sample_size[i]
+
+            np.random.shuffle(label_y_idx)
+            sample_interval = np.cumsum(sample_size)
+            for i in range(self.num_clients):
+                client_idx_map[i][y] = label_y_idx[(sample_interval[i - 1] if i > 0 else 0):sample_interval[i]]
+
+        subsets = []
+        for i in range(self.num_clients):
+            client_i_idx = np.concatenate(list(client_idx_map[i].values()))
+            np.random.shuffle(client_i_idx)
+            subsets.append(Subset(dataset, client_i_idx))
+
+        return subsets
 
 
-    def prepare_data(self):
+    def prepare_data(self, partition):
         """
         Loads data from data_path and splits into client and test dataloader
         """
         # Load image data and split into client datasets
         training_data = ImageFolder(self.data_path + "/train", transform=self.train_transform)
-        client_data = self.split_data(training_data)
+        # Split training data into client datasets based on partition strategy
+        if (partition == "iid"):
+            client_data = self.balanced_split(training_data)
+        elif (partition == "random"):
+            client_data = self.random_split(training_data)
+        elif (partition == "dirichlet"):
+            client_data = self.dirichlet_split(training_data)
+
         test_data = ImageFolder(self.data_path + "/test", transform=self.test_transform)
         
         # Create client dataloaders
@@ -80,9 +162,20 @@ class Dataset:
         # Create test dataloader
         self.test_dataloader = DataLoader(test_data, batch_size=self.batch_size, shuffle=True)
 
-    def prepare_diffusion_data(self):
+    # def prepare_diffusion_data(self):
+    #     """
+    #     Loads data from data_path and splits into client dataloader
+    #     """
+    #     diffusion_data = ImageFolder(self.data_path + "/diffusion", transform=self.diffusion_transform)
+    #     self.diffusion_dataloader = DataLoader(diffusion_data, batch_size=self.batch_size, shuffle=True)
+
+    def set_synthetic_data(self):
+        self.synthetic_folder = self.data_path + "/synthetic"
+
+    def get_synthetic_data(self, round):
         """
-        Loads data from data_path and splits into client dataloader
+        Loads synthetic data from synthetic_folder
         """
-        diffusion_data = ImageFolder(self.data_path + "/diffusion", transform=self.diffusion_transform)
-        self.diffusion_dataloader = DataLoader(diffusion_data, batch_size=self.batch_size, shuffle=True)
+        synthetic_data = ImageFolder(self.synthetic_folder + "/round_" + str(round), transform=self.train_transform)
+        synthetic_dataloader = DataLoader(synthetic_data, batch_size=self.kd_batch_size, shuffle=True)
+        return synthetic_dataloader

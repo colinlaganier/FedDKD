@@ -6,7 +6,6 @@ from federated import Client, Dataset, Server, Scheduler
 
 def main(args):
 
-    assert torch.cuda.is_available(), "CUDA is not available"
     num_devices = torch.cuda.device_count()
     print("Number of GPUs available: {}".format(num_devices))
 
@@ -20,21 +19,23 @@ def main(args):
     else:
         client_models = ClientModelStrategy.available[args.client_model](args.num_clients)
 
-    # Create clients and assign data and models
-    clients = [None] * args.num_clients
-    for client_id in range(args.num_clients):
-        clients[client_id] = Client(client_id)
-        clients[client_id].set_data(dataset.client_dataloaders[client_id])
-        clients[client_id].set_model(client_models[client_id])
+    # # Create clients and assign data and models
+    # clients = [None] * args.num_clients
+    # for client_id in range(args.num_clients):
+    #     clients[client_id] = Client(client_id)
+    #     clients[client_id].set_data(dataset.client_dataloaders[client_id])
+    #     clients[client_id].set_model(client_models[client_id])
 
-        if args.load_diffusion:
-            clients[client_id].get_diffusion()
+    #     if args.load_diffusion:
+    #         clients[client_id].get_diffusion()
 
     # Create server
-    server = Server(args.server_model)
+    # server = Server(arg./s.server_model)
 
     # Create scheduler
-    scheduler = Scheduler(args.num_clients, )
+    scheduler = Scheduler(args.num_clients, num_devices, args.server_model, client_models, dataset, args.epochs, args.batch_size, args.load_diffusion)
+
+    scheduler.init_training()
 
     # scheduler.init_diffusion(args.load_diffusion)
     # scheduler.init_clients()
@@ -55,7 +56,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--num-clients", type=int, default=2)
     parser.add_argument("--load-diffusion", type=bool, default=False)
-    print(list(Models.available.keys()))
+    # print(list(Models.available.keys()))
 
     # parser.add_argument("--num-classes", type=int, default=1000)
     # parser.add_argument("--global-batch-size", type=int, default=256)
@@ -67,5 +68,9 @@ if __name__ == "__main__":
     # parser.add_argument("--results-dir", type=str, default="results")
 
     args = parser.parse_args()
+
+    assert torch.cuda.is_available(), "CUDA is not available"
+    assert torch.cuda.device_count() >= args.num_clients, "Not enough GPUs available" #change
+    torch.backends.cudnn.benchmark = False
     
     main(args)

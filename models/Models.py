@@ -9,8 +9,8 @@ class Models:
 
     #############
     @staticmethod
-    def ResNet32():
-        return resnet.ResNet32
+    def ResNet34():
+        return resnet.ResNet34
 
     #############
     @staticmethod
@@ -28,7 +28,7 @@ class Models:
         return vgg.VGG19
     
     available = {"lenet5" : Lenet5, 
-                 "resnet32" : ResNet32,
+                 "resnet34" : ResNet34,
                  "resnet18" : ResNet18,
                  "mobilenetv3" : MobileNetV3,
                  "vgg" : VGG}    
