@@ -4,7 +4,8 @@
 /diffusion/dataset/
 
 # Tensorboard event files
-/runs/
+/runs/*
+!runs/README.md
 ### macOS ###
 # General
 .DS_Store
