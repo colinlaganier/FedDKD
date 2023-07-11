@@ -51,6 +51,8 @@ class Dataset:
             return [0.4914, 0.4822, 0.4465], [0.2470, 0.2435, 0.2616]
         elif (dataset_id == "cifar100"):
             return [0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]
+        elif (dataset_id == "cinic10"):
+            return [0.47889522, 0.47227842, 0.43047404], [0.24205776, 0.23828046, 0.25874835]
         
         
     def random_split(self, dataset):

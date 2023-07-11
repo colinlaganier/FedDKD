@@ -1,14 +1,18 @@
 import math
+import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.multiprocessing as mp
+from torch.utils.data import DataLoader, TensorDataset
 from queue import Queue
 import Client, Dataset, Server
+from knowledge_distillation import Logits, SoftTarget
 
 class Scheduler:
 
-    def __init__(self, num_clients, 
+    def __init__(self, 
+                 num_clients, 
                  num_devices, 
                  server_model, 
                  client_models, 
@@ -18,7 +22,10 @@ class Scheduler:
                  data_path, 
                  dataset_id, 
                  data_partition, 
-                 load_diffusion):
+                 load_diffusion,
+                 logger):
+
+        self.logger = logger
 
         self.clients = [None] * num_clients
         self.device_dict = dict(zip(range(num_devices), [[] for _ in range(num_devices)]))
@@ -31,21 +38,30 @@ class Scheduler:
 
         self.client_devices = None
         self.client_models = client_models
-        # self.client_optimizer = client_optimizer
-        # self.criterion = criterion
-        # model and dataset dependant
-        self.training_params = {"optimizer": optim.SGD, 
-                                "criterion": nn.CrossEntropyLoss, 
-                                "lr": 0.1 , 
-                                "momentum": 0.9, 
-                                "weight_decay": 1e-4, 
-                                "num_classes": 10}
 
         # Training parameters
         self.round = 0
         self.num_rounds = num_rounds
         self.train_epochs = epochs
         self.batch_size = batch_size
+        self.eval_seed = random.randint(0, 100000)
+
+        # model and dataset dependant
+        self.training_params = {"num_classes": 10,
+                                "optimizer": optim.SGD, 
+                                "criterion": nn.CrossEntropyLoss, 
+                                "lr": 0.1 , 
+                                "momentum": 0.9, 
+                                "epochs": self.train_epochs,
+                                "weight_decay": 1e-4, 
+                                "kd_optimizer": optim.SGD,
+                                "kd_criterion": SoftTarget,
+                                "kd_lr": 0.1,
+                                "kd_momentum": 0.9,
+                                "kd_alpha": 0.5,
+                                "kd_temperature": 1,
+                                "kd_epochs": 10,
+                                "eval_seed": self.eval_seed}
 
         # Setup
         self.dataset = Dataset(data_path, dataset_id, batch_size, num_clients)
@@ -54,7 +70,7 @@ class Scheduler:
             self.dataset.set_synthetic_data()
         self.assign_devices()
         self.setup_clients()
-        self.server = Server(self.server_device, self.server_model, self.server_optimizer)
+        self.server = Server(self.server_device, self.server_model, self.training_params, self.logger)
         self.init_clients()
 
     def assign_devices(self):
@@ -96,8 +112,9 @@ class Scheduler:
         for client_id in range(self.num_clients):            
             self.clients[client_id] = Client(client_id, 
                                         self.client_devices[client_id], 
-                                        self.client_models[client_id], 
-                                        self.dataset.client_dataloaders[client_id])        
+                                        self.client_models[client_id](), 
+                                        self.dataset.client_dataloaders[client_id],
+                                        self.logger)        
             
             # Assign client to device in device_dict
             self.device_dict[self.client_devices[client_id]].append(client_id)
@@ -121,6 +138,7 @@ class Scheduler:
         for round in num_rounds:
             self.round += 1
 
+            # Generate server logit
             if self.load_diffusion:
                 synthetic_dataset = self.dataset.get_synthetic_data(round)
                 diffusion_seed = None
@@ -129,17 +147,28 @@ class Scheduler:
                 diffusion_seed = self.server.generate_seed()
                 server_logit = self.server.generate_logit(diffusion_seed)
 
-            
-
+            # Create dataloader for server logit
+            server_logit = DataLoader(TensorDataset(server_logit), batch_size=128)
+            # if (self.num_devices > 1):
+            #     # Distribute server logit to clients DDP?
+   
             # train each client in parallel
             for client in self.clients:
-                client.train(self.train_epochs)
+                # Train client on local data
+                client.train()
+
+                # Knowledge distillation with server logit and synthetic diffusion data
                 if self.load_diffusion:
                     client.set_synthetic_dataset(synthetic_dataset)
                 client.knowledge_distillation(server_logit, diffusion_seed)
+
+                # Generate logit for server update
                 client_logit = client.generate_logit(diffusion_seed)
                 logit_queue.put(client_logit)
 
+                # client.save_checkpoint()
+
+            # Update server model with client logits
             self.server.knowledge_distillation(logit_queue)
 
 

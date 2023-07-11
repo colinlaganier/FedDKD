@@ -28,9 +28,9 @@ class Models:
         return vgg.VGG19
     
     available = {"lenet5" : Lenet5, 
-                 "resnet34" : ResNet34,
-                 "resnet18" : ResNet18,
-                 "mobilenetv3" : MobileNetV3,
-                 "vgg" : VGG}    
+                    "resnet34" : ResNet34,
+                    "resnet18" : ResNet18,
+                    "mobilenetv3" : MobileNetV3,
+                    "vgg" : VGG}    
     
 

@@ -1,6 +1,10 @@
 # Datasets 
 /dataset/cifar-10-batches-py/
+/dataset/cinic-10/
+/diffusion/dataset/
 
+# Tensorboard event files
+/runs/
 ### macOS ###
 # General
 .DS_Store

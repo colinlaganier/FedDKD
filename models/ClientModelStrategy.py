@@ -26,5 +26,5 @@ class ClientModelStrategy:
     available = {"heterogeneous_random" : heterogeneous_random,
                  "homogeneous_random" : heterogeneous_random,
                  "homogenous" : homogenous,
-                 "strategy_1" : heterogeneous_random,
-                 "strategy_2" : heterogeneous_random}
+                 "strategy_1" : strategy_1,
+                 "strategy_2" : strategy_2}

@@ -1,10 +1,14 @@
-import torch
 import argparse
+import os
+import json
+import time
+import torch
 from models.Models import Models
 from models.ClientModelStrategy import ClientModelStrategy
 from federated import Client, Dataset, Server, Scheduler
+from torch.utils.tensorboard import SummaryWriter
 
-def main(args):
+def main(args, logger):
 
     num_devices = torch.cuda.device_count()
     print("Number of GPUs available: {}".format(num_devices))
@@ -33,7 +37,7 @@ def main(args):
     # server = Server(arg./s.server_model)
 
     # Create scheduler
-    scheduler = Scheduler(args.num_clients, num_devices, args.server_model, client_models, dataset, args.epochs, args.batch_size, args.load_diffusion)
+    scheduler = Scheduler(args.num_clients, num_devices, args.server_model, client_models, dataset, args.epochs, args.batch_size, args.load_diffusion, logger)
 
     scheduler.init_training()
 
@@ -56,6 +60,8 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--num-clients", type=int, default=2)
     parser.add_argument("--load-diffusion", type=bool, default=False)
+    parser.add_argument("--save-checkpoint", type=bool, default=False)
+    
     # print(list(Models.available.keys()))
 
     # parser.add_argument("--num-classes", type=int, default=1000)
@@ -69,8 +75,21 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Check if CUDA is available
     assert torch.cuda.is_available(), "CUDA is not available"
     assert torch.cuda.device_count() >= args.num_clients, "Not enough GPUs available" #change
     torch.backends.cudnn.benchmark = False
+
+    # Create tensorboard writer
+    logger = SummaryWriter()
+
+    # Create checkpoint directory for run
+    if (args.save_checkpoint):
+        # Create checkpoint directory
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        os.makedirs(f"checkpoints/{timestr}", exist_ok=True)
+        # Save command line arguments
+        with open(f"checkpoints/{timestr}/commandline_args.txt", 'w') as f:
+            json.dump(args.__dict__, f, indent=2)
     
-    main(args)
+    main(args, logger)
