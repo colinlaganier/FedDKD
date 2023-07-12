@@ -5,7 +5,7 @@ Aknowledgement to [AberHu](https://github.com/AberHu) for his [Knowledge-Distill
 Pytorch implementation of various Knowledge Distillation methods. 
 
 
-## Lists
+## List of Methods
   Name | Method | Paper Link | Code Link
   :---- | ----- | :----: | :----:
   Logits   | mimic learning via regressing logits | [paper](http://papers.nips.cc/paper/5484-do-deep-nets-really-need-to-be-deep.pdf) | [code](logits.py)
