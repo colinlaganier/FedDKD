@@ -12,7 +12,7 @@ class Client:
         self.id = client_id
         self.logger = logger
         self.checkpoint_path = "checkpoints/"
-        self.round = 0
+        self.round = -1 # ignore initial round
 
         self.dataloader = dataloader
         self.model = model
@@ -59,13 +59,11 @@ class Client:
     def train(self):
         """
         Train the client model
-
-        Args:
-            num_epoch (int): number of epochs to train for
         """
         # self.model.to(self.device) 
         torch.manual_seed(self.client_id)
         self.model.train()
+        self.round += 1
 
         # Set statistic variables
         total_loss = 0
@@ -107,8 +105,6 @@ class Client:
             server_logits (torch.Tensor): logits from the server model
             synthetic_data (torch.utils.data.DataLoader): synthetic diffusion data - if not generated at runtime
             diffusion_seed (int): random seed for diffusion sampling - if generated at runtime
-        Returns:
-            torch.Tensor: logits from the client model
         """
 
         # Generate synthetic data if not provided
@@ -148,14 +144,14 @@ class Client:
                 optimizer.step()
 
             # Log statistics
-            self.logger.add_scalar("KD_Loss/Client_{self.client_id:02}", kd_total_loss/len(self.dataloader), epoch)
-            self.logger.add_scalar("KD_Total_Loss/Client_{self.client_id:02}", total_loss/len(self.dataloader), epoch)
+            self.logger.add_scalar("KD_Loss/Client_{self.client_id:02}", kd_total_loss/len(synthetic_data), epoch)
+            self.logger.add_scalar("KD_Total_Loss/Client_{self.client_id:02}", total_loss/len(synthetic_data), epoch)
 
         self.logger.flush()
         del optimizer, kd_criterion, criterion
 
 
-    def generate_logit(self, diffusion_seed=None):
+    def generate_logit(self, synthetic_data=None, diffusion_seed=None):
         """
         Generate logits from the client model
 
@@ -186,9 +182,12 @@ class Client:
 
 
     @torch.inference_mode()
-    def evaluate(self):
+    def evaluate(self, test_dataloader, post_kd=False):
         """
         Evaluate the client model on the test dataset
+
+        Args:
+            test_dataloader (torch.utils.data.DataLoader): test dataset
         """
         torch.manual_seed(self.eval_seed)
         self.model.eval()
@@ -196,7 +195,7 @@ class Client:
         with torch.no_grad():
             total_loss = 0
             total_correct = 0
-            for batch_idx, (data, target) in enumerate(self.test_dataloader):
+            for batch_idx, (data, target) in enumerate(test_dataloader):
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
                 loss = self.criterion(output, target)
@@ -205,8 +204,9 @@ class Client:
                 total_correct += output.argmax(dim=1).eq(target).sum().item() * len(data)
 
          # Log statistics
-            self.logger.add_scalar("Validation_Loss/Client_{self.client_id:02}", total_loss/len(self.test_dataloader), self.round)
-            self.logger.add_scalar("Validation_Accuracy/Client_{self.client_id:02}", total_correct/len(self.test_dataloader), self.round)
+            round = self.round + 0.5 if post_kd else self.round
+            self.logger.add_scalar("Validation_Loss/Client_{self.client_id:02}", total_loss/len(test_dataloader), round)
+            self.logger.add_scalar("Validation_Accuracy/Client_{self.client_id:02}", total_correct/len(test_dataloader), round)
             self.logger.flush()
 
     def save_checkpoint(self):

@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, Subset, random_split
 
 class Dataset:
 
-    def __init__(self, data_path, dataset_id, batch_size, num_clients):
+    def __init__(self, data_path, dataset_id, batch_size, kd_batch_size, num_clients):
         self.data_path = data_path
         self.num_clients = num_clients
         self.batch_size = batch_size
@@ -162,7 +162,7 @@ class Dataset:
             self.client_dataloaders.append(DataLoader(client, batch_size=self.batch_size, shuffle=True))
         
         # Create test dataloader
-        self.test_dataloader = DataLoader(test_data, batch_size=self.batch_size, shuffle=True)
+        self.test_dataloader = DataLoader(test_data, batch_size=self.batch_size, shuffle=False)
 
     # def prepare_diffusion_data(self):
     #     """
@@ -178,6 +178,9 @@ class Dataset:
         """
         Loads synthetic data from synthetic_folder
         """
-        synthetic_data = ImageFolder(self.synthetic_folder + "/round_" + str(round), transform=self.train_transform)
+        if round is None:
+            synthetic_data = ImageFolder(self.synthetic_folder, transform=self.train_transform)
+        else:
+            synthetic_data = ImageFolder(self.synthetic_folder + "/round_" + str(round), transform=self.train_transform)
         synthetic_dataloader = DataLoader(synthetic_data, batch_size=self.kd_batch_size, shuffle=True)
         return synthetic_dataloader

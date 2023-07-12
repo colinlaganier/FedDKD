@@ -18,6 +18,7 @@ class Scheduler:
                  client_models, 
                  epochs, 
                  batch_size, 
+                 kd_batch_size,
                  num_rounds, 
                  data_path, 
                  dataset_id, 
@@ -29,13 +30,10 @@ class Scheduler:
 
         self.clients = [None] * num_clients
         self.device_dict = dict(zip(range(num_devices), [[] for _ in range(num_devices)]))
-
         self.num_devices = num_devices
         self.num_clients = num_clients
-        
         self.server_device = None
         self.server_model = server_model
-
         self.client_devices = None
         self.client_models = client_models
 
@@ -63,14 +61,25 @@ class Scheduler:
                                 "kd_epochs": 10,
                                 "eval_seed": self.eval_seed}
 
-        # Setup
-        self.dataset = Dataset(data_path, dataset_id, batch_size, num_clients)
+        # Setup datasets
+        self.dataset = Dataset(data_path, dataset_id, batch_size, kd_batch_size, num_clients)
         self.dataset.prepare_data(data_partition)
+
+        # If single synthetic dataset
+        self.synthetic_dataset = self.dataset.get_synthetic_data(None)
+
         if load_diffusion:
             self.dataset.set_synthetic_data()
+        
+        # Assign devices to server and clients based on number of devices
         self.assign_devices()
+
+        # Setup server and initialize
+        self.server = Server(self.server_device, self.server_model(), self.training_params, self.logger)
+        self.server.init_server()
+
+        # Setup clients and initialize
         self.setup_clients()
-        self.server = Server(self.server_device, self.server_model, self.training_params, self.logger)
         self.init_clients()
 
     def assign_devices(self):
@@ -125,7 +134,7 @@ class Scheduler:
             client.init_model(self.training_params)
         pass
 
-    def train(self, num_rounds):
+    def train(self, num_rounds, logit_ensemble=True):
         """
         Train client models on local data and perform co-distillation
         
@@ -140,12 +149,14 @@ class Scheduler:
 
             # Generate server logit
             if self.load_diffusion:
-                synthetic_dataset = self.dataset.get_synthetic_data(round)
+                # synthetic_dataset = self.dataset.get_synthetic_data(round)
+                synthetic_dataset = self.synthetic_dataset
                 diffusion_seed = None
-                server_logit = self.server.generate_logit(diffusion_seed, synthetic_dataset)
+                server_logit = self.server.generate_logit(synthetic_dataset, diffusion_seed)
             else:
+                synthetic_dataset = None
                 diffusion_seed = self.server.generate_seed()
-                server_logit = self.server.generate_logit(diffusion_seed)
+                server_logit = self.server.generate_logit(synthetic_dataset, diffusion_seed)
 
             # Create dataloader for server logit
             server_logit = DataLoader(TensorDataset(server_logit), batch_size=128)
@@ -156,20 +167,31 @@ class Scheduler:
             for client in self.clients:
                 # Train client on local data
                 client.train()
+                client.evaluate(self.dataset.test_dataloader)
 
                 # Knowledge distillation with server logit and synthetic diffusion data
-                if self.load_diffusion:
-                    client.set_synthetic_dataset(synthetic_dataset)
-                client.knowledge_distillation(server_logit, diffusion_seed)
+                # if self.load_diffusion:
+                #     client.set_synthetic_dataset(synthetic_dataset)
+                client.knowledge_distillation(server_logit, synthetic_dataset, diffusion_seed)
+                client.evaluate(self.dataset.test_dataloader)
 
                 # Generate logit for server update
-                client_logit = client.generate_logit(diffusion_seed)
+                client_logit = client.generate_logit(synthetic_dataset, diffusion_seed)
                 logit_queue.put(client_logit)
 
                 # client.save_checkpoint()
 
+            if logit_ensemble:
+                # Average client logits
+                num_clients = logit_queue.qsize()
+                logit_sum = torch.zeros_like(client_logit)
+                while not logit_queue.empty():
+                    logit_sum += logit_queue.get()
+                logit_queue.put(logit_sum / num_clients)      
+
             # Update server model with client logits
-            self.server.knowledge_distillation(logit_queue)
+            self.server.knowledge_distillation(logit_queue, synthetic_dataset, diffusion_seed)
+            self.server.evaluate(self.dataset.test_dataloader)
 
 
     def client_update(self, client, server_logit, diffusion_seed, logit_queue):
