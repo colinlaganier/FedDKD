@@ -24,7 +24,7 @@ class Server:
                                                 lr=self.params["lr"], 
                                                 momentum=self.params["momentum"],
                                                 weight_decay=self.params["weight_decay"])
-        self.criterion = self.params["criterion"].to(self.device)
+        self.criterion = self.params["criterion"]().to(self.device)
 
         # if pre_train:
         #     self.synthetic_train()
@@ -142,8 +142,9 @@ class Server:
         torch.manual_seed(self.seed)
 
         self.model.train()
-
+        print("Training on synthetic data...")
         for epoch in range(self.params["synthetic_epochs"]):
+            print(f"Epoch {epoch+1}/{self.params['synthetic_epochs']}")
             for batch_idx, (data, target) in enumerate(self.synthetic_dataset):
                 data, target = data.to(self.device), target.to(self.device)
                 self.optimizer.zero_grad()
@@ -153,5 +154,27 @@ class Server:
                 loss.backward()
                 self.optimizer.step()
 
+                print(f"Loss: {loss.item()}")
+
+            # Log statistics
             self.logger.add_scalar("Loss/Server", loss.item(), epoch)
             self.logger.flush() 
+
+    def save_checkpoint(self):
+        """
+        Save the client model checkpoint
+        """
+        torch.save({
+            'round': self.round,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict()
+            }, self.checkpoint_path)
+        
+    def load_checkpoint(self, checkpoint):
+        """
+        Load the client model checkpoint
+        """
+        checkpoint = torch.load(checkpoint)
+        self.round = checkpoint['round']
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])

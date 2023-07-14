@@ -46,14 +46,14 @@ class Client:
         Initialize the client model training process
         """
         # torch.manual_seed(self.seed)
-        torch.manual_seed(self.client_id)
+        torch.manual_seed(self.id)
         self.model = self.model(self.params["num_classes"])
         self.model.to(self.device)
         self.optimizer = self.params["optimizer"](self.model.parameters(),
                                              lr=self.params["lr"], 
                                              momentum=self.params["momentum"],
                                              weight_decay=self.params["weight_decay"])
-        self.criterion = self.params["criterion"].to(self.device)
+        self.criterion = self.params["criterion"]().to(self.device)
         self.train()
 
     def train(self):
@@ -61,15 +61,15 @@ class Client:
         Train the client model
         """
         # self.model.to(self.device) 
-        torch.manual_seed(self.client_id)
+        torch.manual_seed(self.id)
         self.model.train()
         self.round += 1
 
-        # Set statistic variables
-        total_loss = 0
-        total_correct = 0
-
         for epoch in range(self.params["epochs"]):
+                    # Set statistic variables
+            total_loss = 0
+            total_correct = 0
+            total = 0
             for batch_idx, (data, target) in enumerate(self.dataloader):
                 # Send data and target to device
                 data, target = data.to(self.device), target.to(self.device)
@@ -80,20 +80,23 @@ class Client:
                 # Forward pass
                 output = self.model(data)
                 loss = self.criterion(output, target)
-                total_loss += loss.item()
-                total_correct += output.argmax(dim=1).eq(target).sum().item()
 
                 loss.backward()
                 self.optimizer.step()
 
-                if batch_idx % 100 == 0:
-                    print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                        epoch, batch_idx * len(data), len(self.dataloader.dataset),
-                        100. * batch_idx / len(self.dataloader), loss.item()))
+                total += target.size(0)
+                total_loss += loss.item()
+                _, predicted = torch.max(output.data, 1)
+                total_correct += (predicted == target).sum().item()
+
+                # if batch_idx % 100 == 0:
+                #     print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                #         epoch, batch_idx * len(data), len(self.dataloader.dataset),
+                #         100. * batch_idx / len(self.dataloader), loss.item()))
                     
             # Log statistics
-            self.logger.add_scalar("Training_Loss/Client_{self.client_id:02}", total_loss/len(self.dataloader), epoch)
-            self.logger.add_scalar("Training_Accuracy/Client_{self.client_id:02}", total_correct/len(self.dataloader), epoch)
+            self.logger.add_scalar(f"Training_Loss/Client_{self.id:02}", total_loss/len(self.dataloader), epoch)
+            self.logger.add_scalar(f"Training_Accuracy/Client_{self.id:02}", 100*total_correct/total, epoch)
         
         self.logger.flush()
 
@@ -111,7 +114,7 @@ class Client:
         if synthetic_data is None:
             synthetic_data = self.synthetic_dataset
         
-        torch.manual_seed(self.client_id)
+        torch.manual_seed(self.id)
 
         # self.model.to(self.device)
         self.model.train()
@@ -144,8 +147,8 @@ class Client:
                 optimizer.step()
 
             # Log statistics
-            self.logger.add_scalar("KD_Loss/Client_{self.client_id:02}", kd_total_loss/len(synthetic_data), epoch)
-            self.logger.add_scalar("KD_Total_Loss/Client_{self.client_id:02}", total_loss/len(synthetic_data), epoch)
+            self.logger.add_scalar(f"KD_Loss/Client_{self.id:02}", kd_total_loss/len(synthetic_data), epoch)
+            self.logger.add_scalar(f"KD_Total_Loss/Client_{self.id:02}", total_loss/len(synthetic_data), epoch)
 
         self.logger.flush()
         del optimizer, kd_criterion, criterion
@@ -160,7 +163,7 @@ class Client:
         Returns:
             torch.Tensor: logits from the client model
         """
-        torch.manual_seed(self.client_id)
+        torch.manual_seed(self.id)
 
         if synthetic_data is None:
             synthetic_data = self.synthetic_dataset
@@ -205,8 +208,8 @@ class Client:
 
          # Log statistics
             round = self.round + 0.5 if post_kd else self.round
-            self.logger.add_scalar("Validation_Loss/Client_{self.client_id:02}", total_loss/len(test_dataloader), round)
-            self.logger.add_scalar("Validation_Accuracy/Client_{self.client_id:02}", total_correct/len(test_dataloader), round)
+            self.logger.add_scalar(f"Validation_Loss/Client_{self.id:02}", total_loss/len(test_dataloader), round)
+            self.logger.add_scalar(f"Validation_Accuracy/Client_{self.id:02}", total_correct/len(test_dataloader), round)
             self.logger.flush()
 
     def save_checkpoint(self):
@@ -218,6 +221,15 @@ class Client:
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict()
             }, self.checkpoint_path)
+        
+    def load_checkpoint(self, checkpoint):
+        """
+        Load the client model checkpoint
+        """
+        checkpoint = torch.load(checkpoint)
+        self.round = checkpoint['round']
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         
     def set_synthetic_dataset(self, synthetic_dataset):
         """

@@ -123,6 +123,7 @@ class Scheduler:
                                         self.client_devices[client_id], 
                                         self.client_models[client_id](), 
                                         self.dataset.client_dataloaders[client_id],
+                                        self.training_params,
                                         self.logger)        
             
             # Assign client to device in device_dict
@@ -131,7 +132,7 @@ class Scheduler:
     def init_clients(self):
         # train each client on local data 
         for client in self.clients:
-            client.init_model(self.training_params)
+            client.init_client()
         pass
 
     def train(self, num_rounds, logit_ensemble=True):
