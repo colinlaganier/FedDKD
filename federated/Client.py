@@ -7,11 +7,11 @@ from knowledge_distillation import Logits, SoftTarget
 
 class Client:
 
-    def __init__(self, client_id, device, model, dataloader, params, logger):
+    def __init__(self, client_id, device, model, dataloader, params, checkpoint_path, logger):
         # Client properties
         self.id = client_id
         self.logger = logger
-        self.checkpoint_path = "checkpoints/"
+        self.checkpoint_path = checkpoint_path
         self.round = -1 # ignore initial round
 
         self.dataloader = dataloader
@@ -228,7 +228,7 @@ class Client:
             'round': self.round,
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict()
-            }, self.checkpoint_path)
+            }, self.checkpoint_path + f"/client_{self.id:02}.pt")
         
     def load_checkpoint(self, checkpoint):
         """

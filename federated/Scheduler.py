@@ -29,10 +29,12 @@ class Scheduler:
                  synthetic_path,
                  load_diffusion,
                  save_checkpoint,
+                 checkpoint_path,
                  logger):
 
         self.logger = logger
         self.save_checkpoint = save_checkpoint
+        self.checkpoint_path = checkpoint_path
         self.load_diffusion = load_diffusion
 
         self.clients = [None] * num_clients
@@ -85,7 +87,7 @@ class Scheduler:
         self.assign_devices()
 
         # Setup server and initialize
-        self.server = Server(self.server_device, self.server_model(), self.training_params, self.logger)
+        self.server = Server(self.server_device, self.server_model(), self.training_params, self.checkpoint_path, self.logger)
         self.server.init_server(pre_train=True)
 
         # Setup clients and initialize
@@ -134,6 +136,7 @@ class Scheduler:
                                         self.client_models[client_id](), 
                                         self.dataset.client_dataloaders[client_id],
                                         self.training_params,
+                                        self.checkpoint_path,
                                         self.logger)        
             
             # Assign client to device in device_dict
@@ -143,7 +146,7 @@ class Scheduler:
         # train each client on local data 
         for client in self.clients:
             client.init_client()
-        pass
+        self.save_checkpoints()
 
     def train(self, num_rounds, logit_ensemble=True):
         """

@@ -5,10 +5,11 @@ import random
 
 class Server:
     
-    def __init__(self, device, model, params, logger):
+    def __init__(self, device, model, params, checkpoint_path, logger):
         # Server properties
         self.device = device
         self.logger = logger
+        self.checkpoint_path = checkpoint_path
         self.seed = 42
         self.round = 0
 
@@ -193,7 +194,7 @@ class Server:
             'round': self.round,
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict()
-            }, self.checkpoint_path)
+            }, self.checkpoint_path + f"/server.pt")
         
     def load_checkpoint(self, checkpoint):
         """

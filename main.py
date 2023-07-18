@@ -10,7 +10,7 @@ from models.ClientModelStrategy import ClientModelStrategy
 from federated.Scheduler import Scheduler
 from torch.utils.tensorboard import SummaryWriter
 
-def main(args, logger):
+def main(args, checkpoint_path, logger):
     global scheduler
 
     num_devices = torch.cuda.device_count()
@@ -37,6 +37,7 @@ def main(args, logger):
                           args.synthetic_path, 
                           args.load_diffusion, 
                           args.save_checkpoint,
+                          checkpoint_path,
                           logger)
 
     scheduler.train(args.num_rounds)
@@ -81,10 +82,12 @@ if __name__ == "__main__":
     # Create checkpoint directory for run
     if (args.save_checkpoint):
         # Create checkpoint directory
-        timestr = time.strftime("%Y%m%d-%H%M%S")
-        os.makedirs(f"checkpoints/{timestr}", exist_ok=True)
+        checkpoint_path = "checkpoints/" + time.strftime("%Y%m%d-%H%M%S")
+        os.makedirs(f"{checkpoint_path}", exist_ok=True)
         # Save command line arguments
-        with open(f"checkpoints/{timestr}/commandline_args.txt", 'w') as f:
+        with open(f"{checkpoint_path}/commandline_args.txt", 'w') as f:
             json.dump(args.__dict__, f, indent=2)
+    else:
+        checkpoint_path = None
     
-    main(args, logger)
+    main(args, checkpoint_path, logger)
