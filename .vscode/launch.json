@@ -1,0 +1,18 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["--dataset-id","cinic10","--dataset-path","dataset\\cinic-10","--synthetic-path","diffusion\\dataset\\cifar_10","--num-clients","5", "--load-diffusion", "True"],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}

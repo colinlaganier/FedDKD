@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
 import random
 
 class Server:
@@ -17,7 +18,16 @@ class Server:
         self.optimizer = None
         self.synthetic_dataset = None
 
-    def init_server(self):
+    def init_server(self, pre_train=False):
+        """
+        Initialize the server model training process
+        """
+        print("Initializing server model")
+        torch.manual_seed(self.seed)
+
+        # Log model properties
+        # self.logger.text()
+
         self.model = self.model(self.params["num_classes"])
         self.model.to(self.device)
         self.optimizer = self.params["optimizer"](self.model.parameters(),
@@ -46,32 +56,39 @@ class Server:
         self.round += 1
 
         while not logit_queue.empty():
-            client_logit = logit_queue.get()
-
+            # client_logit = logit_queue.get()
+            client_logit = DataLoader(TensorDataset(logit_queue.get()), batch_size=self.params["kd_batch_size"])
             optimizer = self.params["kd_optimizer"](self.model.parameters(), lr=self.params["kd_lr"], momentum=self.params["kd_momentum"])
 
             kd_criterion = self.params["kd_criterion"](self.params["kd_temperature"]).to(self.device)
             criterion = self.params["criterion"]().to(self.device)
 
             for epoch in range(self.params["kd_epochs"]):
+                kd_total_loss = 0
+                cls_total_loss = 0
+
                 for batch_idx, ((data, target), logit) in enumerate(zip(synthetic_data, client_logit)):
-                    data, target = data.to(self.device), target.to(self.device)
+                    logit = logit[0]
+                    data, target, logit = data.to(self.device), target.to(self.device), logit.to(self.device)
+                    
                     self.optimizer.zero_grad()
+                    
                     output = self.model(data)
 
                     # Compute loss
-                    kd_loss = self.params["kd_alpha"] * kd_criterion(output, logit)
-                    loss = (1 - self.params["kd_alpha"]) * criterion(output, target) + self.params["kd_alpha"] * kd_loss
+                    kd_loss = kd_criterion(output, logit)
+                    cls_loss = criterion(output, target)
+                    loss = (1 - self.params["kd_alpha"]) * cls_loss + self.params["kd_alpha"] * kd_loss
                     
                     kd_total_loss += kd_loss.item()
-                    total_loss += loss.item()
+                    cls_total_loss += loss.item()
 
                     loss.backward()
                     optimizer.step()
                 
                 # Log statistics
-                self.logger.add_scalar("KD_Loss/Server", kd_total_loss/len(synthetic_data), epoch)
-                self.logger.add_scalar("KD_Total_Loss/Server", total_loss/len(synthetic_data), epoch)
+                self.logger.add_scalar("KD_Loss/Server", kd_total_loss/len(synthetic_data), self.round * self.params["kd_epochs"] + epoch)
+                self.logger.add_scalar("KD_Class_Loss/Server", cls_total_loss/len(synthetic_data), self.round * self.params["kd_epochs"] + epoch)
 
             self.logger.flush()
             del optimizer, kd_criterion, criterion
@@ -115,23 +132,26 @@ class Server:
         Args:
             dataloader (DataLoader): test dataset
         """
-        torch.manual_seed(self.eval_seed)
+        torch.manual_seed(self.params["eval_seed"])
         self.model.eval()
         
         with torch.no_grad():
             total_loss = 0
             total_correct = 0
+            total = 0 
             for batch_idx, (data, target) in enumerate(dataloader):
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
                 loss = self.criterion(output, target)
 
-                total_loss += loss.item() * len(data)
-                total_correct += output.argmax(dim=1).eq(target).sum().item() * len(data)
+                total += target.size(0)
+                total_loss += loss.item()
+                _, predicted = torch.max(output.data, 1)
+                total_correct += (predicted == target).sum().item()
 
          # Log statistics
             self.logger.add_scalar("Validation_Loss/Server", total_loss/len(dataloader), self.round)
-            self.logger.add_scalar("Validation_Accuracy/Server", total_correct/len(dataloader), self.round)
+            self.logger.add_scalar("Validation_Accuracy/Server",  100*total_correct/total, self.round)
             self.logger.flush()
 
     def synthetic_train(self):
@@ -142,9 +162,10 @@ class Server:
         torch.manual_seed(self.seed)
 
         self.model.train()
-        print("Training on synthetic data...")
         for epoch in range(self.params["synthetic_epochs"]):
-            print(f"Epoch {epoch+1}/{self.params['synthetic_epochs']}")
+            total_loss = 0
+            total_correct = 0
+            total = 0
             for batch_idx, (data, target) in enumerate(self.synthetic_dataset):
                 data, target = data.to(self.device), target.to(self.device)
                 self.optimizer.zero_grad()
@@ -154,10 +175,14 @@ class Server:
                 loss.backward()
                 self.optimizer.step()
 
-                print(f"Loss: {loss.item()}")
+                total += target.size(0)
+                total_loss += loss.item()
+                _, predicted = torch.max(output.data, 1)
+                total_correct += (predicted == target).sum().item()
 
             # Log statistics
-            self.logger.add_scalar("Loss/Server", loss.item(), epoch)
+            self.logger.add_scalar("Training_Loss/Server", total_loss/len(self.synthetic_dataset), self.round * self.params["epochs"] + epoch)
+            self.logger.add_scalar(f"Training_Accuracy/Server", 100*total_correct/total, self.round * self.params["epochs"] + epoch)
             self.logger.flush() 
 
     def save_checkpoint(self):

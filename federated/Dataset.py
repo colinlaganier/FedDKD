@@ -175,7 +175,7 @@ class Dataset:
     def set_synthetic_data(self):
         self.synthetic_folder = self.data_path + "/synthetic"
 
-    def get_synthetic_data(self, round):
+    def get_synthetic_data(self, round=None):
         """
         Loads synthetic data from synthetic_folder
         """
