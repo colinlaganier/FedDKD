@@ -22,6 +22,9 @@ class Server:
     def init_server(self, pre_train=False):
         """
         Initialize the server model training process
+
+        Args:
+            pre_train (bool): whether to pre-train the server model
         """
         print("Initializing server model")
         torch.manual_seed(self.seed)
@@ -37,8 +40,8 @@ class Server:
                                                 weight_decay=self.params["weight_decay"])
         self.criterion = self.params["criterion"]().to(self.device)
 
-        # if pre_train:
-        #     self.synthetic_train()
+        if pre_train:
+            self.synthetic_train()
 
     def knowledge_distillation(self, logit_queue, synthetic_data=None, diffusion_seed=None):
         """
@@ -188,7 +191,7 @@ class Server:
 
     def save_checkpoint(self):
         """
-        Save the client model checkpoint
+        Save the server model checkpoint
         """
         torch.save({
             'round': self.round,
@@ -199,6 +202,9 @@ class Server:
     def load_checkpoint(self, checkpoint):
         """
         Load the client model checkpoint
+
+        Args:
+            checkpoint (str): path to checkpoint
         """
         checkpoint = torch.load(checkpoint)
         self.round = checkpoint['round']

@@ -59,7 +59,7 @@ class Client:
                                              momentum=self.params["momentum"],
                                              weight_decay=self.params["weight_decay"])
         self.criterion = self.params["criterion"]().to(self.device)
-        # self.train()
+        self.train()
 
     def train(self):
         """
@@ -163,6 +163,7 @@ class Client:
         Generate logits from the client model
 
         Args:
+            synthetic_data (torch.utils.data.DataLoader): synthetic diffusion data - if not generated at runtime
             diffusion_seed (int): random seed for diffusion sampling - if generated at runtime
         Returns:
             torch.Tensor: logits from the client model
@@ -233,6 +234,9 @@ class Client:
     def load_checkpoint(self, checkpoint):
         """
         Load the client model checkpoint
+
+        Args:
+            checkpoint (str): path to the checkpoint
         """
         checkpoint = torch.load(checkpoint)
         self.round = checkpoint['round']

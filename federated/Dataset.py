@@ -56,39 +56,41 @@ class Dataset:
             return [0.47889522, 0.47227842, 0.43047404], [0.24205776, 0.23828046, 0.25874835]
         
         
-    def random_split(self, dataset):
+    def random_split(self, dataset, num_splits):
         """
         Splits training data into client datasets based on num_clients and splitting strategy
         
         Args:
             dataset (torch.utils.data.Dataset): training data
+            num_splits (int): number of client datasets to split into
         Returns:s
             client_data (list): list of client datasets
         """
         if self.equal_split:
-            return random_split(dataset, [len(dataset) // self.num_clients] * self.num_clients)
+            return random_split(dataset, [len(dataset) // num_splits] * num_splits)
         
-    def balanced_split(self, dataset):
+    def balanced_split(self, dataset, num_splits):
         """
         Splits training data into client datasets with balanced classes
         
         Args:
             dataset (torch.utils.data.Dataset): training data
+            num_splits (int): number of client datasets to split into
         Returns:
             client_data (list): list of client datasets
         """
-        samples_per_class = len(dataset) // self.num_clients
-        remainder = len(dataset) % self.num_clients
+        samples_per_class = len(dataset) // num_splits
+        remainder = len(dataset) % num_splits
 
         class_counts = [0] * self.num_classes # number of samples per class
-        subset_indices = [[] for _ in range(self.num_clients)] # indices of samples per subset
+        subset_indices = [[] for _ in range(num_splits)] # indices of samples per subset
         for i, (data, target) in enumerate(dataset):
             # Add sample to subset if number of samples per class is less than samples_per_class
             if class_counts[target] < samples_per_class:
-                subset_indices[i % self.num_clients].append(i)
+                subset_indices[i % num_splits].append(i)
                 class_counts[target] += 1
             elif remainder > 0:
-                subset_indices[i % self.num_clients].append(i)
+                subset_indices[i % num_splits].append(i)
                 class_counts[target] += 1
                 remainder -= 1
 
@@ -98,12 +100,13 @@ class Dataset:
         return subsets
         
 
-    def dirichlet_split(self, dataset, beta=0.1):
+    def dirichlet_split(self, dataset, num_splits, beta=0.1):
         """
         Splits training data into client datasets based Dirichlet distribution
 
         Args:
             dataset (torch.utils.data.Dataset): training data
+            num_splits (int): number of client datasets to split into
             beta (float): concentration parameter of Dirichlet distribution
         Returns:
             client_data (list): list of client datasets       
@@ -112,11 +115,11 @@ class Dataset:
         label_distributions = []
         # Generate label distributions for each class using Dirichlet distribution
         for y in range(len(dataset.classes)):
-            label_distributions.append(np.random.dirichlet(np.repeat(beta, self.num_clients)))
+            label_distributions.append(np.random.dirichlet(np.repeat(beta, num_splits)))
 
         labels = np.array(dataset.targets).astype(int)
-        client_idx_map = {i: {} for i in range(self.num_clients)}
-        client_size_map = {i: {} for i in range(self.num_clients)}
+        client_idx_map = {i: {} for i in range(num_splits)}
+        client_size_map = {i: {} for i in range(num_splits)}
 
         for y in range(len(dataset.classes)):
             label_y_idx = np.where(labels == y)[0]
@@ -124,17 +127,17 @@ class Dataset:
 
             # Sample number of samples for each client from label distribution
             sample_size = (label_distributions[y] * label_y_size).astype(int)
-            sample_size[self.num_clients - 1] += len(label_y_idx) - np.sum(sample_size)
-            for i in range(self.num_clients):
+            sample_size[num_splits - 1] += len(label_y_idx) - np.sum(sample_size)
+            for i in range(num_splits):
                 client_size_map[i][y] = sample_size[i]
 
             np.random.shuffle(label_y_idx)
             sample_interval = np.cumsum(sample_size)
-            for i in range(self.num_clients):
+            for i in range(num_splits):
                 client_idx_map[i][y] = label_y_idx[(sample_interval[i - 1] if i > 0 else 0):sample_interval[i]]
 
         subsets = []
-        for i in range(self.num_clients):
+        for i in range(num_splits):
             client_i_idx = np.concatenate(list(client_idx_map[i].values()))
             np.random.shuffle(client_i_idx)
             subsets.append(Subset(dataset, client_i_idx))
@@ -150,11 +153,11 @@ class Dataset:
         training_data = ImageFolder(self.data_path + "/train", transform=self.train_transform)
         # Split training data into client datasets based on partition strategy
         if (partition == "iid"):
-            client_data = self.balanced_split(training_data)
+            client_data = self.balanced_split(training_data, self.num_clients)
         elif (partition == "random"):
-            client_data = self.random_split(training_data)
+            client_data = self.random_split(training_data, self.num_clients)
         elif (partition == "dirichlet"):
-            client_data = self.dirichlet_split(training_data)
+            client_data = self.dirichlet_split(training_data, self.num_clients)
 
         test_data = ImageFolder(self.data_path + "/test", transform=self.test_transform)
         
