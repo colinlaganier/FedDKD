@@ -3,11 +3,11 @@ channels:
   - pytorch
   - nvidia
 dependencies:
-  - python >= 3.8
+  - python >= 3.10
   - pytorch >= 1.13
   - torchvision
   - pytorch-cuda=11.7
   - pip:
-    - timm
-    - diffusers
-    - accelerate
+    - numpy
+    - argparse
+    - tensorboard==2.13.0
