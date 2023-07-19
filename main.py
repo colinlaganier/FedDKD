@@ -11,6 +11,14 @@ from federated.Scheduler import Scheduler
 from torch.utils.tensorboard import SummaryWriter
 
 def main(args, checkpoint_path, logger):
+    """
+    Main function for running the federated learning process
+
+    Args:
+        args (argparse.Namespace): command line arguments
+        checkpoint_path (str): path to save checkpoints
+        logger (SummaryWriter): tensorboard logger
+    """ 
     global scheduler
 
     num_devices = torch.cuda.device_count()
@@ -43,6 +51,13 @@ def main(args, checkpoint_path, logger):
     scheduler.train(args.num_rounds)
 
 def handler(signum, frame):
+    """
+    Handler for terminating the program with Ctrl-C
+
+    Args:
+        signum (int): signal number
+        frame (frame): current stack frame
+    """
     res = input("Ctrl-C was pressed. Do you want to save client and server checkpoints y/n ")
     if res == 'y':
         scheduler.save_checkpoints()
@@ -50,8 +65,10 @@ def handler(signum, frame):
     exit(1)
 
 if __name__ == "__main__":
+    # Register handler for termination
     signal.signal(signal.SIGINT, handler)
 
+    # Parse command line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset-id", type=str, choices=["cifar10", "cifar100", "cinic10"], default="cifar10")
     parser.add_argument("--dataset-path", type=str, required=True)

@@ -17,6 +17,7 @@ class Dataset:
         self.client_dataloaders = []
         self.test_dataloader = None
         self.num_classes = 10 if (dataset_id == "cifar10") else 100
+        self.synthetic_dataset = []
         # self.diffusion
 
         # Dataset transforms
@@ -163,10 +164,10 @@ class Dataset:
         
         # Create client dataloaders
         for client in client_data:
-            self.client_dataloaders.append(DataLoader(client, batch_size=self.batch_size, shuffle=True))
+            self.client_dataloaders.append(DataLoader(client, batch_size=self.batch_size, num_workers=4, shuffle=True))
         
         # Create test dataloader
-        self.test_dataloader = DataLoader(test_data, batch_size=self.batch_size, shuffle=False)
+        self.test_dataloader = DataLoader(test_data, batch_size=self.batch_size, num_workers=4, shuffle=False)
 
     # def prepare_diffusion_data(self):
     #     """
@@ -186,5 +187,16 @@ class Dataset:
             synthetic_data = ImageFolder(self.synthetic_path, transform=self.train_transform)
         else:
             synthetic_data = ImageFolder(self.synthetic_path + "/round_" + str(round), transform=self.train_transform)
-        synthetic_dataloader = DataLoader(synthetic_data, batch_size=self.kd_batch_size, shuffle=True)
+        synthetic_dataloader = DataLoader(synthetic_data, batch_size=self.kd_batch_size,  num_workers=4, shuffle=True)
         return synthetic_dataloader
+    
+    def synthetic_dataset_test(self):
+        num_partition = 9
+        synthetic_data = ImageFolder(self.synthetic_path, transform=self.train_transform)
+        synthetic_data = self.balanced_split(synthetic_data, num_partition)
+        for i in range(num_partition):
+            self.synthetic_dataset.append(DataLoader(synthetic_data[i], batch_size=self.kd_batch_size,  num_workers=4, shuffle=False))
+
+    def get_synthetic_dataset_test(self, round):
+        round = round % 9
+        return self.synthetic_dataset[round]

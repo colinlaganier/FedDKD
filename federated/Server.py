@@ -61,7 +61,7 @@ class Server:
 
         while not logit_queue.empty():
             # client_logit = logit_queue.get()
-            client_logit = DataLoader(TensorDataset(logit_queue.get()), batch_size=self.params["kd_batch_size"])
+            client_logit = DataLoader(TensorDataset(logit_queue.get()), batch_size=self.params["kd_batch_size"], num_workers=4)
             optimizer = self.params["kd_optimizer"](self.model.parameters(), lr=self.params["kd_lr"], momentum=self.params["kd_momentum"])
 
             kd_criterion = self.params["kd_criterion"](self.params["kd_temperature"]).to(self.device)

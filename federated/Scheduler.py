@@ -76,9 +76,9 @@ class Scheduler:
         # Setup datasets
         self.dataset = Dataset(data_path, dataset_id, batch_size, kd_batch_size, num_clients, synthetic_path)
         self.dataset.prepare_data(data_partition)
-
+        self.dataset.synthetic_dataset_test()
         # If single synthetic dataset
-        self.synthetic_dataset = self.dataset.get_synthetic_data(None)
+        # self.synthetic_dataset = self.dataset.get_synthetic_data(None)
 
         # if load_diffusion:
         #     self.dataset.set_synthetic_data()
@@ -88,7 +88,7 @@ class Scheduler:
 
         # Setup server and initialize
         self.server = Server(self.server_device, self.server_model(), self.training_params, self.checkpoint_path, self.logger)
-        self.server.init_server(self.synthetic_dataset, pre_train=True)
+        self.server.init_server(self.dataset.get_synthetic_dataset_test(0), pre_train=True)
 
         # Setup clients and initialize
         self.setup_clients()
@@ -166,9 +166,10 @@ class Scheduler:
 
             # Generate server logit
             if self.load_diffusion:
-                if (self.synthetic_dataset is None):
+                # if (self.synthetic_dataset is None):
                     # self.synthetic_dataset = self.dataset.get_synthetic_data(round)
-                    self.synthetic_dataset = self.dataset.get_synthetic_data()
+                    # self.synthetic_dataset = self.dataset.get_synthetic_data()
+                self.synthetic_dataset = self.dataset.get_synthetic_dataset_test(round)
                 
                 synthetic_dataset = self.synthetic_dataset
                 
@@ -180,7 +181,7 @@ class Scheduler:
                 server_logit = self.server.generate_logits(synthetic_dataset, diffusion_seed)
 
             # Create dataloader for server logit
-            server_logit = DataLoader(TensorDataset(server_logit), batch_size=self.kd_batch_size)
+            server_logit = DataLoader(TensorDataset(server_logit), batch_size=self.kd_batch_size, num_workers=4)
             # if (self.num_devices > 1):
             #     # Distribute server logit to clients DDP?
    
