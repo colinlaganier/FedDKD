@@ -26,9 +26,6 @@ class Client:
         self.eval_seed = None
         self.synthetic_dataset = None
         self.epochs = None
-        # self.kd_epochs = None
-        # self.kd_temperature = 1
-        # self.kd_alpha = 0.5
         self.params = params
 
     def set_device(self, device):

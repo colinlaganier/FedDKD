@@ -19,7 +19,7 @@ class Server:
         self.optimizer = None
         self.synthetic_dataset = None
 
-    def init_server(self, pre_train=False):
+    def init_server(self, synthetic_dataset = None, pre_train=False):
         """
         Initialize the server model training process
 
@@ -41,7 +41,7 @@ class Server:
         self.criterion = self.params["criterion"]().to(self.device)
 
         if pre_train:
-            self.synthetic_train()
+            self.synthetic_train(synthetic_dataset)
 
     def knowledge_distillation(self, logit_queue, synthetic_data=None, diffusion_seed=None):
         """
@@ -158,7 +158,7 @@ class Server:
             self.logger.add_scalar("Validation_Accuracy/Server",  100*total_correct/total, self.round)
             self.logger.flush()
 
-    def synthetic_train(self):
+    def synthetic_train(self, synthetic_dataset):
         """
         Train the server model on synthetic data for initialisation
         """
@@ -166,11 +166,11 @@ class Server:
         torch.manual_seed(self.seed)
 
         self.model.train()
-        for epoch in range(self.params["synthetic_epochs"]):
+        for epoch in range(self.params["epochs"]):
             total_loss = 0
             total_correct = 0
             total = 0
-            for batch_idx, (data, target) in enumerate(self.synthetic_dataset):
+            for batch_idx, (data, target) in enumerate(synthetic_dataset):
                 data, target = data.to(self.device), target.to(self.device)
                 self.optimizer.zero_grad()
                 output = self.model(data)
@@ -185,7 +185,7 @@ class Server:
                 total_correct += (predicted == target).sum().item()
 
             # Log statistics
-            self.logger.add_scalar("Training_Loss/Server", total_loss/len(self.synthetic_dataset), self.round * self.params["epochs"] + epoch)
+            self.logger.add_scalar("Training_Loss/Server", total_loss/len(synthetic_dataset), self.round * self.params["epochs"] + epoch)
             self.logger.add_scalar(f"Training_Accuracy/Server", 100*total_correct/total, self.round * self.params["epochs"] + epoch)
             self.logger.flush() 
 

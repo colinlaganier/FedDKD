@@ -88,7 +88,7 @@ class Scheduler:
 
         # Setup server and initialize
         self.server = Server(self.server_device, self.server_model(), self.training_params, self.checkpoint_path, self.logger)
-        self.server.init_server(pre_train=True)
+        self.server.init_server(self.synthetic_dataset, pre_train=True)
 
         # Setup clients and initialize
         self.setup_clients()
