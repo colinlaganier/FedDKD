@@ -18,6 +18,7 @@ class Server:
         self.params = params
         self.optimizer = None
         self.synthetic_dataset = None
+        self.client_logits = None
 
     def init_server(self, synthetic_dataset = None, pre_train=False):
         """
@@ -40,15 +41,33 @@ class Server:
                                                 weight_decay=self.params["weight_decay"])
         self.criterion = self.params["criterion"]().to(self.device)
 
-        if pre_train:
-            self.synthetic_train(synthetic_dataset)
+        # if pre_train:
+            # self.synthetic_train(synthetic_dataset)
 
-    def knowledge_distillation(self, logit_queue, synthetic_data=None, diffusion_seed=None):
+    def aggregate_logits(self, client_logits):
+        """
+        Aggregate client logits into a single tensor of average logits
+
+        Args:
+            client_logits (Queue): queue of client logits
+        """
+
+        num_clients = client_logits.qsize()
+        logit_sum = torch.zeros_like(client_logits.queue[0])
+        
+        # Aggregate client logits
+        while not client_logits.empty():
+            logit_sum += client_logits.get()
+
+        # Put average logit value  back into queue
+        client_logits.put(logit_sum / num_clients)
+        self.client_logits = client_logits
+
+    def knowledge_distillation(self, synthetic_data=None, diffusion_seed=None):
         """
         Knowledge distillation from client logits to server model
         
         Args:
-            logit_queue (Queue): queue of client logits
             synthetic_data (TensorDataset): synthetic diffusion data
             diffusion_seed (int): random seed for diffusion
         """
@@ -59,9 +78,9 @@ class Server:
         self.model.train()
         self.round += 1
 
-        while not logit_queue.empty():
+        while not self.client_logits.empty():
             # client_logit = logit_queue.get()
-            client_logit = DataLoader(TensorDataset(logit_queue.get()), batch_size=self.params["kd_batch_size"], num_workers=4)
+            client_logit = DataLoader(TensorDataset(self.client_logits.get()), batch_size=self.params["kd_batch_size"], num_workers=4)
             optimizer = self.params["kd_optimizer"](self.model.parameters(), lr=self.params["kd_lr"], momentum=self.params["kd_momentum"])
 
             kd_criterion = self.params["kd_criterion"](self.params["kd_temperature"]).to(self.device)
@@ -170,7 +189,7 @@ class Server:
             total_loss = 0
             total_correct = 0
             total = 0
-            for batch_idx, (data, target) in enumerate(synthetic_dataset):
+            for batch_idx, (data, target) in enumerate(  ):
                 data, target = data.to(self.device), target.to(self.device)
                 self.optimizer.zero_grad()
                 output = self.model(data)

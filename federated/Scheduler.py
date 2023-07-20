@@ -173,16 +173,16 @@ class Scheduler:
                 #     self.synthetic_dataset = self.dataset.get_synthetic_data()
                 
                 synthetic_dataset = self.dataset.get_synthetic_data(round)
-                
                 diffusion_seed = None
-                server_logit = self.server.generate_logits(synthetic_dataset, diffusion_seed)
             else:
                 synthetic_dataset = None
                 diffusion_seed = self.server.generate_seed()
+            
+            if round != 0:
                 server_logit = self.server.generate_logits(synthetic_dataset, diffusion_seed)
+                # Create dataloader for server logit
+                server_logit = DataLoader(TensorDataset(server_logit), batch_size=self.kd_batch_size)
 
-            # Create dataloader for server logit
-            server_logit = DataLoader(TensorDataset(server_logit), batch_size=self.kd_batch_size)
             # if (self.num_devices > 1):
             #     # Distribute server logit to clients DDP?
    
@@ -197,9 +197,10 @@ class Scheduler:
                 # Knowledge distillation with server logit and synthetic diffusion data
                 # if self.load_diffusion:
                 #     client.set_synthetic_dataset(synthetic_dataset)
-                print("Knowledge distillation")
-                client.knowledge_distillation(server_logit, synthetic_dataset, diffusion_seed)
-                client.evaluate(self.dataset.test_dataloader, True)
+                if round != 0:
+                    print("Knowledge distillation")
+                    client.knowledge_distillation(server_logit, synthetic_dataset, diffusion_seed)
+                    client.evaluate(self.dataset.test_dataloader, True)
 
                 # Generate logit for server update
                 client_logit = client.generate_logits(synthetic_dataset, diffusion_seed)
@@ -209,16 +210,16 @@ class Scheduler:
                 if self.save_checkpoint and self.round % 5 == 0:
                     client.save_checkpoint()
 
-            if logit_ensemble:
-                # Average client logits
-                num_clients = logit_queue.qsize()
-                logit_sum = torch.zeros_like(client_logit)
-                while not logit_queue.empty():
-                    logit_sum += logit_queue.get()
-                logit_queue.put(logit_sum / num_clients)      
-
+            # if logit_ensemble:
+            #     # Average client logits
+            #     num_clients = logit_queue.qsize()
+            #     logit_sum = torch.zeros_like(client_logit)
+            #     while not logit_queue.empty():
+            #         logit_sum += logit_queue.get()
+            #     logit_queue.put(logit_sum / num_clients)      
+            self.server.aggregate_logits(logit_queue)
             # Update server model with client logits
-            self.server.knowledge_distillation(logit_queue, synthetic_dataset, diffusion_seed)
+            self.server.knowledge_distillation(synthetic_dataset, diffusion_seed)
             self.server.evaluate(self.dataset.test_dataloader)
 
         # Save checkpoint
