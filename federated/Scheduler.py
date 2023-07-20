@@ -76,7 +76,8 @@ class Scheduler:
         # Setup datasets
         self.dataset = Dataset(data_path, dataset_id, batch_size, kd_batch_size, num_clients, synthetic_path)
         self.dataset.prepare_data(data_partition)
-        self.dataset.synthetic_dataset_test()
+        # self.dataset.synthetic_dataset_test()
+
         # If single synthetic dataset
         # self.synthetic_dataset = self.dataset.get_synthetic_data(None)
 
@@ -88,8 +89,9 @@ class Scheduler:
 
         # Setup server and initialize
         self.server = Server(self.server_device, self.server_model(), self.training_params, self.checkpoint_path, self.logger)
-        self.server.init_server(self.dataset.get_synthetic_dataset_test(0), pre_train=True)
-
+        # self.server.init_server(self.synthetic_dataset, pre_train=True)
+        self.server.init_server(self.dataset.get_synthetic_train(), pre_train=True)
+        
         # Setup clients and initialize
         self.setup_clients()
         self.init_clients()
@@ -167,11 +169,10 @@ class Scheduler:
             # Generate server logit
             if self.load_diffusion:
                 # if (self.synthetic_dataset is None):
-                    # self.synthetic_dataset = self.dataset.get_synthetic_data(round)
-                    # self.synthetic_dataset = self.dataset.get_synthetic_data()
-                self.synthetic_dataset = self.dataset.get_synthetic_dataset_test(round)
+                #     # self.synthetic_dataset = self.dataset.get_synthetic_data(round)
+                #     self.synthetic_dataset = self.dataset.get_synthetic_data()
                 
-                synthetic_dataset = self.synthetic_dataset
+                synthetic_dataset = self.dataset.get_synthetic_data(round)
                 
                 diffusion_seed = None
                 server_logit = self.server.generate_logits(synthetic_dataset, diffusion_seed)
@@ -181,19 +182,22 @@ class Scheduler:
                 server_logit = self.server.generate_logits(synthetic_dataset, diffusion_seed)
 
             # Create dataloader for server logit
-            server_logit = DataLoader(TensorDataset(server_logit), batch_size=self.kd_batch_size, num_workers=4)
+            server_logit = DataLoader(TensorDataset(server_logit), batch_size=self.kd_batch_size)
             # if (self.num_devices > 1):
             #     # Distribute server logit to clients DDP?
    
             # train each client in parallel
             for client in self.clients:
                 # Train client on local data
+                print("Client {}".format(client.id))
+                print("Training")
                 client.train()
                 client.evaluate(self.dataset.test_dataloader)
 
                 # Knowledge distillation with server logit and synthetic diffusion data
                 # if self.load_diffusion:
                 #     client.set_synthetic_dataset(synthetic_dataset)
+                print("Knowledge distillation")
                 client.knowledge_distillation(server_logit, synthetic_dataset, diffusion_seed)
                 client.evaluate(self.dataset.test_dataloader, True)
 

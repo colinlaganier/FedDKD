@@ -213,7 +213,7 @@ class Client:
                 total_correct += (predicted == target).sum().item()
 
          # Log statistics
-            round = self.round + 0.5 if post_kd else self.round
+            round = self.round * 2 + 1 if post_kd else self.round * 2
             self.logger.add_scalar(f"Validation_Loss/Client_{self.id:02}", total_loss/len(test_dataloader), round)
             self.logger.add_scalar(f"Validation_Accuracy/Client_{self.id:02}", 100*total_correct/total, round)
             self.logger.flush()

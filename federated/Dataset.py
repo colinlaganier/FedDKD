@@ -18,6 +18,7 @@ class Dataset:
         self.test_dataloader = None
         self.num_classes = 10 if (dataset_id == "cifar10") else 100
         self.synthetic_dataset = []
+        self.server_synthetic_dataset = None
         # self.diffusion
 
         # Dataset transforms
@@ -164,10 +165,10 @@ class Dataset:
         
         # Create client dataloaders
         for client in client_data:
-            self.client_dataloaders.append(DataLoader(client, batch_size=self.batch_size, num_workers=4, shuffle=True))
+            self.client_dataloaders.append(DataLoader(client, batch_size=self.batch_size, shuffle=True))
         
         # Create test dataloader
-        self.test_dataloader = DataLoader(test_data, batch_size=self.batch_size, num_workers=4, shuffle=False)
+        self.test_dataloader = DataLoader(test_data, batch_size=self.batch_size, shuffle=False)
 
     # def prepare_diffusion_data(self):
     #     """
@@ -184,19 +185,27 @@ class Dataset:
         Loads synthetic data from synthetic_folder
         """
         if round is None:
-            synthetic_data = ImageFolder(self.synthetic_path, transform=self.train_transform)
+            synthetic_data = ImageFolder(self.synthetic_path, transform=self.test_transform)
         else:
-            synthetic_data = ImageFolder(self.synthetic_path + "/round_" + str(round), transform=self.train_transform)
-        synthetic_dataloader = DataLoader(synthetic_data, batch_size=self.kd_batch_size,  num_workers=4, shuffle=True)
+            round = round % 20
+            synthetic_data = ImageFolder(self.synthetic_path + "/round_" + str(round), transform=self.test_transform)
+        synthetic_dataloader = DataLoader(synthetic_data, batch_size=self.kd_batch_size, shuffle=False)
+        return synthetic_dataloader
+    
+    def get_synthetic_train(self):
+        synthetic_data = ImageFolder(self.synthetic_path + "/round_0", transform=self.train_transform)
+        synthetic_dataloader = DataLoader(synthetic_data, batch_size=self.batch_size, shuffle=True)
         return synthetic_dataloader
     
     def synthetic_dataset_test(self):
-        num_partition = 9
-        synthetic_data = ImageFolder(self.synthetic_path, transform=self.train_transform)
+        num_partition = 18
+        synthetic_data = ImageFolder(self.synthetic_path, transform=self.test_transform)
         synthetic_data = self.balanced_split(synthetic_data, num_partition)
         for i in range(num_partition):
-            self.synthetic_dataset.append(DataLoader(synthetic_data[i], batch_size=self.kd_batch_size,  num_workers=4, shuffle=False))
+            self.synthetic_dataset.append(DataLoader(synthetic_data[i], batch_size=self.kd_batch_size, shuffle=False))
+
+        self.server_synthetic_dataset = DataLoader(synthetic_data[0], batch_size=self.batch_size, shuffle=True)
 
     def get_synthetic_dataset_test(self, round):
-        round = round % 9
+        round = round % 18
         return self.synthetic_dataset[round]
