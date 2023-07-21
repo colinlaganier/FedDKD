@@ -245,7 +245,7 @@ class Scheduler:
         if self.save_checkpoint and self.round % 5 == 0:
             client.save_checkpoint()
 
-    def train_mp(self, num_rounds, train_epochs):
+    def train_mp(self, num_rounds):
         global procs
 
         # Initialize logit queue for server update after each round
