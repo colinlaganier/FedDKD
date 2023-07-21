@@ -49,6 +49,7 @@ class Client:
         # self.logger.add_text()
 
         torch.manual_seed(self.id)
+        # self.model = self.model(weights=None, num_classes=self.params["num_classes"])
         self.model = self.model(self.params["num_classes"])
         self.model.to(self.device)
         self.optimizer = self.params["optimizer"](self.model.parameters(),
@@ -67,7 +68,9 @@ class Client:
         self.model.train()
         self.round += 1
 
-        for epoch in range(self.params["epochs"]):
+        num_epochs = self.params["epochs"] * 2.5 if round == 0 else self.params["epochs"]
+
+        for epoch in range(num_epochs):
                     # Set statistic variables
             total_loss = 0
             total_correct = 0

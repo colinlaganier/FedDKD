@@ -30,9 +30,7 @@ class Server:
         print("Initializing server model")
         torch.manual_seed(self.seed)
 
-        # Log model properties
-        # self.logger.text()
-
+        # self.model = self.model(weights=None, num_classes=self.params["num_classes"])
         self.model = self.model(self.params["num_classes"])
         self.model.to(self.device)
         self.optimizer = self.params["optimizer"](self.model.parameters(),
@@ -41,8 +39,8 @@ class Server:
                                                 weight_decay=self.params["weight_decay"])
         self.criterion = self.params["criterion"]().to(self.device)
 
-        # if pre_train:
-            # self.synthetic_train(synthetic_dataset)
+        if pre_train:
+            self.synthetic_train(synthetic_dataset)
 
     def aggregate_logits(self, client_logits):
         """
@@ -185,11 +183,11 @@ class Server:
         torch.manual_seed(self.seed)
 
         self.model.train()
-        for epoch in range(self.params["epochs"]):
+        for epoch in range(25):
             total_loss = 0
             total_correct = 0
             total = 0
-            for batch_idx, (data, target) in enumerate(  ):
+            for batch_idx, (data, target) in enumerate(synthetic_dataset):
                 data, target = data.to(self.device), target.to(self.device)
                 self.optimizer.zero_grad()
                 output = self.model(data)

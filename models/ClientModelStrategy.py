@@ -21,7 +21,7 @@ class ClientModelStrategy:
     
     @staticmethod
     def strategy_2(num_clients):
-        return [Models.MobileNetV3] * (num_clients // 2) + [Models.ResNet18] * (num_clients - (num_clients // 2))
+        return [Models.MobileNetV3] * (num_clients // 2) + [Models.ShuffleNetV2] * (num_clients - (num_clients // 2))
     
     available = {"heterogeneous_random" : heterogeneous_random,
                  "homogeneous_random" : heterogeneous_random,
