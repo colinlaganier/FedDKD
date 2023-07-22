@@ -6,6 +6,7 @@ import torch.optim as optim
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader, TensorDataset
 from queue import Queue
+from multiprocessing import Queue as mpQueue
 from federated.Client import Client
 from federated.Dataset import Dataset
 from federated.Server import Server
@@ -210,13 +211,6 @@ class Scheduler:
                 if self.save_checkpoint and self.round % 5 == 0:
                     client.save_checkpoint()
 
-            # if logit_ensemble:
-            #     # Average client logits
-            #     num_clients = logit_queue.qsize()
-            #     logit_sum = torch.zeros_like(client_logit)
-            #     while not logit_queue.empty():
-            #         logit_sum += logit_queue.get()
-            #     logit_queue.put(logit_sum / num_clients)      
             self.server.aggregate_logits(logit_queue)
             # Update server model with client logits
             self.server.knowledge_distillation(synthetic_dataset, diffusion_seed)
@@ -228,41 +222,73 @@ class Scheduler:
         self.server.save_checkpoint()
 
 
-    # def client_update(self, client, server_logit, diffusion_seed, logit_queue):
-    #     # Train client on local data
-    #     client.train(self.train_epochs)
-    #     # Knowledge distillation with server logit and synthetic diffusion data
-    #     client.knowledge_distillation(server_logit, diffusion_seed)
-    #     # Generate logit for server update
-    #     client_logit = client.generate_logits(diffusion_seed)
-    #     logit_queue.put(client_logit)
+    def client_update(self, client, server_logit, synthetic_dataset, diffusion_seed, logit_queue):
+        # Train client on local data
+        print("Client {}".format(client.id))
+        print("Training")
+        client.train()
+        client.evaluate(self.dataset.test_dataloader)
 
-    # def train_mp(self, num_rounds, train_epochs):
+        # Knowledge distillation with server logit and synthetic diffusion data
+        # if self.load_diffusion:
+        #     client.set_synthetic_dataset(synthetic_dataset)
+        if round != 0:
+            print("Knowledge distillation")
+            client.knowledge_distillation(server_logit, synthetic_dataset, diffusion_seed)
+            client.evaluate(self.dataset.test_dataloader, True)
 
-    #     # Initialize logit queue for server update after each round
-    #     logit_queue = Queue()
+        # Generate logit for server update
+        client_logit = client.generate_logits(synthetic_dataset, diffusion_seed)
+        logit_queue.put(client_logit)
 
-    #     for _ in num_rounds:
-    #         self.round += 1
+        # Save checkpoint
+        if self.save_checkpoint and self.round % 5 == 0:
+            client.save_checkpoint()
 
-    #         diffusion_seed = self.server.generate_seed()
-    #         server_logit = self.server.get_logit()
-    #         processes = [] 
+    def train_mp(self, num_rounds):
+        global procs
 
-    #         # Start processes for each client on each device
-    #         for i in range(math.ceil(self.num_clients / self.num_devices)):
-    #             for device, client_ids in self.device_dict.items():
-    #                 if i < len(client_ids):
-    #                     process = mp.Process(target=self.client_update, args=(self.clients[client_ids[i]], server_logit, diffusion_seed, logit_queue))
-    #                     process.start()
-    #                     processes.append(process)
+        # Initialize logit queue for server update after each round
+        logit_queue = mpQueue()
 
-    #         # Wait for all processes to finish
-    #         for process in processes:
-    #             process.join()
+        for round in range(num_rounds):
+            print("Round {}".format(round))
+            self.round += 1
 
-    #         # Update server model with client logit queue
-    #         self.server.knowledge_distillation(logit_queue)
+            # Generate server logit
+            if self.load_diffusion:
+                synthetic_dataset = self.dataset.get_synthetic_data(round)
+                diffusion_seed = None
+            else:
+                synthetic_dataset = None
+                diffusion_seed = self.server.generate_seed()
+
+            if round != 0:
+                server_logit = self.server.generate_logits(synthetic_dataset, diffusion_seed)
+                # Create dataloader for server logit
+                server_logit = DataLoader(TensorDataset(server_logit), batch_size=self.kd_batch_size)
+            else:
+                server_logit = None
+
+            print("global procs: ", len(procs))
+            processes = []
+
+            # Start processes for each client on each device
+            for i in range(math.ceil(self.num_clients / self.num_devices)):
+                for device, client_ids in self.device_dict.items():
+                    if i < len(client_ids):
+                        process = mp.Process(target=self.client_update, args=(self.clients[client_ids[i]], server_logit, synthetic_dataset, diffusion_seed, logit_queue))
+                        process.start()
+                        processes.append(process)
+
+            # Wait for all processes to finish
+            for process in processes:
+                process.join()
+
+            self.server.aggregate_logits(logit_queue)
+            # Update server model with client logits
+            self.server.knowledge_distillation(synthetic_dataset, diffusion_seed)
+            self.server.evaluate(self.dataset.test_dataloader)
 
     def save_checkpoints(self):
         for client in self.clients:

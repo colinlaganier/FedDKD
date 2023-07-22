@@ -5,6 +5,7 @@ import json
 import signal
 import time
 import torch
+import torch.multiprocessing as mp
 from models.Models import Models
 from models.ClientModelStrategy import ClientModelStrategy
 from federated.Scheduler import Scheduler
@@ -48,7 +49,7 @@ def main(args, checkpoint_path, logger):
                           checkpoint_path,
                           logger)
 
-    scheduler.train(args.num_rounds)
+    scheduler.train_mp(args.num_rounds)
 
 def handler(signum, frame):
     """
@@ -65,6 +66,13 @@ def handler(signum, frame):
     exit(1)
 
 if __name__ == "__main__":
+    global processes
+    try:
+        mp.set_start_method('spawn', force=True)
+        procs = []
+    except ValueError:
+        print("Multiprocessing start problem")
+
     # Register handler for termination
     signal.signal(signal.SIGINT, handler)
 
