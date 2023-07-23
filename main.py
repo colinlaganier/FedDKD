@@ -49,7 +49,7 @@ def main(args, checkpoint_path, logger):
                           checkpoint_path,
                           logger)
 
-    scheduler.train_mp(args.num_rounds)
+    scheduler.train_phases(args.num_rounds)
 
 def handler(signum, frame):
     """
@@ -66,13 +66,6 @@ def handler(signum, frame):
     exit(1)
 
 if __name__ == "__main__":
-    global processes
-    try:
-        mp.set_start_method('spawn', force=True)
-        procs = []
-    except ValueError:
-        print("Multiprocessing start problem")
-
     # Register handler for termination
     signal.signal(signal.SIGINT, handler)
 

@@ -221,6 +221,73 @@ class Scheduler:
             client.save_checkpoint()
         self.server.save_checkpoint()
 
+    def train_phases(self, num_rounds):
+        """
+        Train client models on local data and perform co-distillation
+        
+        Args:
+            num_rounds (int): number of rounds to train
+            logit_ensemble (bool): whether to perform logit ensemble
+        """
+        logit_queue = Queue()
+
+        print("Training network for {} communication rounds".format(num_rounds))
+
+        for round in range(num_rounds):
+            print("Round {}".format(round))
+            self.round += 1
+
+            # Generate server logit
+            if self.load_diffusion:
+                synthetic_dataset = self.dataset.get_synthetic_data(round)
+                diffusion_seed = None
+            else:
+                synthetic_dataset = None
+                diffusion_seed = self.server.generate_seed()
+            
+            server_logit = None
+            if round > 20:
+                server_logit = self.server.generate_logits(synthetic_dataset, diffusion_seed)
+                # Create dataloader for server logit
+                server_logit = DataLoader(TensorDataset(server_logit), batch_size=self.kd_batch_size)
+
+            # if (self.num_devices > 1):
+            #     # Distribute server logit to clients DDP?
+   
+            # train each client in parallel
+            for client in self.clients:
+                # Train client on local data
+                print("Client {}".format(client.id))
+                print("Training")
+                client.train()
+                client.evaluate(self.dataset.test_dataloader)
+
+                # Knowledge distillation with server logit and synthetic diffusion data
+                # if self.load_diffusion:
+                #     client.set_synthetic_dataset(synthetic_dataset)
+                if server_logit is not None:
+                    print("Knowledge distillation")
+                    client.knowledge_distillation(server_logit, synthetic_dataset, diffusion_seed)
+                    client.evaluate(self.dataset.test_dataloader, True)
+
+                # Generate logit for server update
+                client_logit = client.generate_logits(synthetic_dataset, diffusion_seed)
+                logit_queue.put(client_logit)
+
+                # Save checkpoint
+                if self.save_checkpoint and self.round % 5 == 0:
+                    client.save_checkpoint()
+
+            self.server.aggregate_logits(logit_queue)
+            # Update server model with client logits
+            self.server.knowledge_distillation(synthetic_dataset, diffusion_seed)
+            self.server.evaluate(self.dataset.test_dataloader)
+
+        # Save checkpoint
+        for client in self.clients:
+            client.save_checkpoint()
+        self.server.save_checkpoint()
+
 
     def client_update(self, client, server_logit, synthetic_dataset, diffusion_seed, logit_queue):
         # Train client on local data
