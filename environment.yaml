@@ -7,6 +7,7 @@ dependencies:
   - pytorch >= 1.13
   - torchvision
   - pytorch-cuda=11.7
+  - pip
   - pip:
     - numpy
     - argparse

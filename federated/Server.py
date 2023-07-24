@@ -32,6 +32,9 @@ class Server:
 
         # self.model = self.model(weights=None, num_classes=self.params["num_classes"])
         self.model = self.model(self.params["num_classes"])
+        if torch.cuda.device_count() > 1: 
+            print("Using multiple GPUs")
+            self.model = nn.DataParallel(self.model)
         self.model.to(self.device)
         self.optimizer = self.params["optimizer"](self.model.parameters(),
                                                 lr=self.params["lr"], 
