@@ -102,32 +102,32 @@ class Scheduler:
         Assigns GPU device id to clients
         """
         # Multi GPU 
-        if (self.num_devices > 1):
-            # Find optimal device assignment for balance
-            num_devices_avail = self.num_devices
-            avg_num_clients = (self.num_clients + 1) // num_devices_avail
-            remainder = (self.num_clients + 1) % num_devices_avail
+        # if (self.num_devices > 1):
+        #     # Find optimal device assignment for balance
+        #     num_devices_avail = self.num_devices
+        #     avg_num_clients = (self.num_clients + 1) // num_devices_avail
+        #     remainder = (self.num_clients + 1) % num_devices_avail
 
-            client_devices = []
-            start = 0
+        #     client_devices = []
+        #     start = 0
 
-            for i in range(num_devices_avail):
-                if remainder > 0:
-                    end = start + avg_num_clients + 1
-                    remainder -= 1
-                else:
-                    end = start + avg_num_clients
+        #     for i in range(num_devices_avail):
+        #         if remainder > 0:
+        #             end = start + avg_num_clients + 1
+        #             remainder -= 1
+        #         else:
+        #             end = start + avg_num_clients
 
-                client_devices.extend([i] * (end - start))
-                start = end
+        #         client_devices.extend([i] * (end - start))
+        #         start = end
 
-            self.server_device = client_devices[0]
-            self.client_devices = client_devices[1:]            
-        # Single GPU
-        else:
-            # Assign all clients to the same device
-            self.server_device = 0
-            self.client_devices = [0] * self.num_clients
+        #     self.server_device = client_devices[0]
+        #     self.client_devices = client_devices[1:]            
+        # # Single GPU
+        # else:
+        # Assign all clients to the same device
+        self.server_device = 0
+        self.client_devices = [0] * self.num_clients
 
     def setup_clients(self):
         """
