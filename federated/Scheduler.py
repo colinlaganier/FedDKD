@@ -180,10 +180,10 @@ class Scheduler:
                 synthetic_dataset = None
                 diffusion_seed = self.server.generate_seed()
             
-            if round != 0:
-                server_logit = self.server.generate_logits(synthetic_dataset, diffusion_seed)
-                # Create dataloader for server logit
-                server_logit = DataLoader(TensorDataset(server_logit), batch_size=self.kd_batch_size)
+            # if round != 0:
+            #     server_logit = self.server.generate_logits(synthetic_dataset, diffusion_seed)
+            #     # Create dataloader for server logit
+            #     server_logit = DataLoader(TensorDataset(server_logit), batch_size=self.kd_batch_size)
 
             # if (self.num_devices > 1):
             #     # Distribute server logit to clients DDP?
@@ -193,8 +193,8 @@ class Scheduler:
                 # Train client on local data
                 print("Client {}".format(client.id))
                 print("Training")
-                client.train()
-                client.evaluate(self.dataset.test_dataloader)
+                # client.train()
+                # client.evaluate(self.dataset.test_dataloader)
 
                 # Knowledge distillation with server logit and synthetic diffusion data
                 # if self.load_diffusion:
@@ -212,12 +212,12 @@ class Scheduler:
                 # Save checkpoint
                 if self.save_checkpoint and self.round % 5 == 0:
                     client.save_checkpoint()
-            
+            print("Knowledge Distillation")
             for idx, client in enumerate(self.clients):
                 # Calculate teacher logits for client
                 # logging.info(f"##### Client {client.client_idx} #####")
                 teacher_logits = torch.mean(torch.stack(logit_arr[:idx] + logit_arr[idx + 1:]), dim=0)
-                teacher_logits = DataLoader(TensorDataset(teacher_logits), batch_size=self.args.batch_size)
+                teacher_logits = DataLoader(TensorDataset(teacher_logits), batch_size=self.kd_batch_size)
                 client.knowledge_distillation(teacher_logits, synthetic_dataset, diffusion_seed)
 
             # self.server.aggregate_logits(logit_queue)
