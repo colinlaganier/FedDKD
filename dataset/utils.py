@@ -1,14 +1,16 @@
 import os
 import random
 import shutil
+import argparse
 from torchvision.datasets import ImageFolder
 
-def split_dataset():
+def split_dataset(num_split):
     # Get the total number of samples in the dataset
 
-    data_dir = "dataset/cinic-10/synthetic/"
+    data_dir = "cinic-10/valid/"
+    out_dir = "cinic-10/synthetic/"
     dataset = ImageFolder(data_dir)
-    num_datasets = 20
+    num_datasets = num_split
     total_samples = len(dataset)
 
     # Shuffle the indices to randomize the data
@@ -22,7 +24,7 @@ def split_dataset():
     split_indices = [indices[i * samples_per_dataset: (i + 1) * samples_per_dataset] for i in range(num_datasets)]
 
     # Create directories for each smaller dataset
-    output_dirs = [os.path.join(data_dir, f"dataset_{i}") for i in range(num_datasets)]
+    output_dirs = [os.path.join(out_dir, f"round_{i}") for i in range(num_datasets)]
     for output_dir in output_dirs:
         os.makedirs(output_dir, exist_ok=True)
 
@@ -34,3 +36,12 @@ def split_dataset():
             dst_dir = os.path.join(output_dirs[i], class_name)
             os.makedirs(dst_dir, exist_ok=True)
             shutil.copy(file_path, dst_dir)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--num-split", type=int, default=20)
+    
+    args = parser.parse_args()
+    
+    split_dataset(args.num_split)
+    print("Dataset successfully split")
