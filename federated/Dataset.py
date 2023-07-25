@@ -9,6 +9,7 @@ class Dataset:
 
     def __init__(self, data_path, dataset_id, batch_size, kd_batch_size, num_clients, synthetic_path=None):
         self.data_path = data_path
+        self.dataset_id = dataset_id
         self.synthetic_path = synthetic_path
         self.num_clients = num_clients
         self.batch_size = batch_size
@@ -153,6 +154,8 @@ class Dataset:
         """
         # Load image data and split into client datasets
         training_data = ImageFolder(self.data_path + "/train", transform=self.train_transform)
+        if self.synthetic_path == "cinic10":
+            assert len(training_data) == 90000
         # Split training data into client datasets based on partition strategy
         if (partition == "iid"):
             client_data = self.balanced_split(training_data, self.num_clients)

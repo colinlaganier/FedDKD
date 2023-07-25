@@ -49,7 +49,7 @@ def main(args, checkpoint_path, logger):
                           checkpoint_path,
                           logger)
 
-    scheduler.train_phases(args.num_rounds)
+    scheduler.train(args.num_rounds)
 
 def handler(signum, frame):
     """
