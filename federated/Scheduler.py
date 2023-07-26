@@ -193,11 +193,11 @@ class Scheduler:
                 # Train client on local data
                 print("Client {}".format(client.id))
                 print("Training")
-                # client.train()
-                # client.evaluate(self.dataset.test_dataloader)
+                client.train()
+                client.evaluate(self.dataset.test_dataloader)
 
                 # Knowledge distillation with server logit and synthetic diffusion data
-                # if self.load_diffusion:
+                # if self.load_diffusion:   
                 #     client.set_synthetic_dataset(synthetic_dataset)
                 # if round != 0:
                 #     print("Knowledge distillation")
