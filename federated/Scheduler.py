@@ -160,13 +160,13 @@ class Scheduler:
             logit_ensemble (bool): whether to perform logit ensemble
         """
         # logit_queue = Queue()
-        logit_arr = []
 
         print("Training network for {} communication rounds".format(num_rounds))
 
         for round in range(num_rounds):
             print("Round {}".format(round))
             self.round += 1
+            logit_arr = []
 
             # Generate server logit
             if self.load_diffusion:
