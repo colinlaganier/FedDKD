@@ -1,6 +1,7 @@
 # Datasets 
 /dataset/cifar-10-batches-py/
 /dataset/cinic-10/
+/dataset/emnist/
 /diffusion/dataset/
 /checkpoints/*
 !checkpoints/README.md
