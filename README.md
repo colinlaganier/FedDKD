@@ -7,9 +7,10 @@ Master's Dissertation supervised by Dr. Zhongguo Li
 
 ## Abstract
 
-Federated learning (FL) is a distributed machine learning paradigm that enables multiple parties to collaboratively train a shared model without sharing their private data. However, a limitation of FL is the requirement for one singular model to be common to all agents. In this paper, we propose a novel FL framework, FedKDD, to allow for training of heterogeneous models. FedKDD consists of two phases: a knowledge distillation phase and a federated learning phase. In the knowledge distillation phase, a teacher model is trained on the data of all clients. Then, the teacher model is used to guide the training of the student model in the federated learning phase. In particular, we propose a diffusion-based knowledge distillation method to transfer knowledge from the teacher model to the student model. We conduct extensive experiments on three benchmark datasets, i.e., CIFAR-10, CIFAR-100 and CINIC-10.
+Federated learning (FL) is a distributed machine learning paradigm that enables multiple parties to collaboratively train a shared model without sharing their private data. However, a limitation of FL is the requirement for one singular model to be common to all agents. In this project, we propose a novel FL framework, FedKDD, to allow for training of heterogeneous models. 
+First a diffusion model is trained from the local data of the clients. From there the clients are trained on the local data. Then, in the knowledge distilation phase, the clients learn from each other and the server model learns from the aggregated client logits. Our solution proposes a data-free method, leveraging synthetic from the diffusion model to transfer knowledge from the teacher model to the student model. We conduct extensive experiments on two benchmark datasets, i.e., EMNIST, CIFAR-10 and CINIC-10.
 
-## Requirments
+## Requirements
 Install all the packages from environment.yml file using conda:
 
 ```
@@ -24,7 +25,7 @@ conda env create -f environment.yaml
 ## Running the experiments
 The baseline experiment trains the model in the conventional way.
 
-* To run the baseline experiment on CIFAR-10 dataset with ```ResNet32``` server model and hetergeneous ```ResNet``` clients, run the following command:
+* To run the baseline experiment on CINIC-10 dataset with ```ResNet32``` server model and hetergeneous ```ResNet``` clients, run the following command:
 
 ```
 python main.py --dataset cifar-10 --data --model resnet32 --epochs 10 --gpu 0
@@ -33,41 +34,28 @@ python main.py --dataset cifar-10 --data --model resnet32 --epochs 10 --gpu 0
 You can change the default values of other parameters to simulate different conditions. Refer to the options section.
 
 ## Options
-The default values for various paramters parsed to the experiment are given in ```options.py```. Details are given some of those parameters:
+Training parameters and other options can be set in the ```main.py``` file. The following options are available:
 
-* ```--dataset-id:```  Default: 'cifar10'. Options: 'cifar10', 'cifar100'
+* ```--dataset-id:```  Name of target dataset. Default: 'cifar10'. Options: 'cifar10', 'cinc10', 'emnist'
 * ```--data-path:```    Path to the directory containing the dataset.
-* ```--server-model:```    Default: 'resnet32'. Options: 'resnet18', 'resnet32', 'mobilenet3', 'lenet5', 'vgg'
-* ```--gpu:```      Default: None (runs on CPU). Can also be set to the specific gpu id.
-<!-- * ```--epochs:```   Number of rounds of training.
-* ```--lr:```       Learning rate set to 0.01 by default.
-* ```--verbose:```  Detailed log outputs. Activated by default, set to 0 to deactivate.
-* ```--seed:```     Random Seed. Default set to 1. 
-parser.add_argument("--dataset-id", type=str, choices=["cifar10", "cifar100"], default="cifar10")
-    # parser.add_argument("--data-path", type=str, required=True)
-    parser.add_argument("--server-model", type=str, choices=list(Models.available.keys()), default="resnet32")
-    parser.add_argument("--client-model", type=str, choices=list(Models.available.keys()) + list(ClientModelStrategy.available.keys()), default="strategy_1")
-    parser.add_argument("--image-size", type=int, choices=[256, 512], default=256)
-    parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--num-clients", type=int, default=2)
-    parser.add_argument("--load-diffusion", type=bool, default=False)
-    print(list(Models.available.keys())) -->
-
-<!-- #### Federated Parameters
-* ```--iid:```      Distribution of data amongst users. Default set to IID. Set to 0 for non-IID.
-* ```--num_users:```Number of users. Default is 100.
-* ```--frac:```     Fraction of users to be used for federated updates. Default is 0.1.
-* ```--local_ep:``` Number of local training epochs in each user. Default is 10.
-* ```--local_bs:``` Batch size of local updates in each user. Default is 10.
-* ```--unequal:```  Used in non-iid setting. Option to split the data amongst users equally or unequally. Default set to 0 for equal splits. Set to 1 for unequal splits. -->
-
-
+* ```--data-partition:```   Dataset splitting method. Default: 'iid'. Options: 'iid', 'non-iid'
+* ```--server-model:```   Model for server. Default: 'resnet32'. Options: 'resnet32', 'resnet18', 'mobilenetv3', 'shufflenetv2', 'vgg'
+* ```--client-model``` Model for server. Default: 'strategy_1'. Options: 'heterogeneous_random', 'homogeneous_random', 'homogenous', 'strategy_1', 'strategy_2' (see ```ClientModelStrategy```)
+* ```--epochs:```   Number of rounds of training. Default: 10
+* ```--kd-epochs:```   Number of rounds of knowledge distillation. Default: 10
+* ```--batch-size:```   Batch size for training. Default: 32
+* ```--kd-batch-size:```   Batch size for knowledge distillation. Default: 32
+* ```--num-rounds:```   Number of communication rounds. Default: 10
+* ```--num-clients:```   Number of clients. Default: 5
+* ```--load-diffusion:```   Load diffusion model from file. Default: True
+* ```--save-checkpoint:```   Save checkpoint of the model. Default: False
 
 ## Further Readings
-### Papers:
 * [Federated learning by employing knowledge distillation on edge devices with limited hardware resources](https://doi.org/10.1016/j.neucom.2023.02.011)
 * [Is Synthetic Data From Diffusion Models Ready for Knowledge Distillation?](https://arxiv.org/abs/2305.12954)
-* [Deep Learning with Differential Privacy](https://arxiv.org/abs/1607.00133)
 
-<!-- The proposed implementation is a data-free method building upon: Tanghatari, Ehsan & Kamal, Mehdi & Afzali-Kusha, Ali & Pedram, Massoud. (2023). Federated Learning by Employing Knowledge Distillation on Edge Devices with Limited Hardware Resources. Neurocomputing. 531. 10.1016/j.neucom.2023.02.011. -->
+
+<!-- to do section -->
+## Future Work
+* Checkpoints, logs and figures will be uploaded soon.
+* Implement differential privacy for the diffusion model (see [related work](https://arxiv.org/abs/2302.13861)).
