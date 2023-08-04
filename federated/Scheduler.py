@@ -80,7 +80,7 @@ class Scheduler:
         # self.dataset.synthetic_dataset_test()
 
         # If single synthetic dataset
-        # self.synthetic_dataset = self.dataset.get_synthetic_data(None)
+        self.synthetic_dataset = self.dataset.get_synthetic_data(None)
 
         # if load_diffusion:
         #     self.dataset.set_synthetic_data()
@@ -91,8 +91,8 @@ class Scheduler:
         # Setup server and initialize
         self.server = Server(self.server_device, self.server_model(), self.training_params, self.checkpoint_path, self.logger)
         # self.server.init_server(self.synthetic_dataset, pre_train=True)
-        self.server.init_server(self.dataset.get_synthetic_train(), pre_train=True)
-        
+        # self.server.init_server(self.dataset.get_synthetic_train(), pre_train=True)
+        self.server.init_server()
         # Setup clients and initialize
         self.setup_clients()
         self.init_clients()
@@ -161,6 +161,8 @@ class Scheduler:
         """
         # logit_queue = Queue()
         logit_arr = []
+        synthetic_dataset = self.synthetic_dataset
+        diffusion_seed = None
 
         print("Training network for {} communication rounds".format(num_rounds))
 
@@ -169,25 +171,22 @@ class Scheduler:
             self.round += 1
 
             # Generate server logit
-            if self.load_diffusion:
-                # if (self.synthetic_dataset is None):
-                #     # self.synthetic_dataset = self.dataset.get_synthetic_data(round)
-                #     self.synthetic_dataset = self.dataset.get_synthetic_data()
+            # if self.load_diffusion:
+            #     # if (self.synthetic_dataset is None):
+            #     #     # self.synthetic_dataset = self.dataset.get_synthetic_data(round)
+            #     #     self.synthetic_dataset = self.dataset.get_synthetic_data()
                 
-                synthetic_dataset = self.dataset.get_synthetic_data(round)
-                diffusion_seed = None
-            else:
-                synthetic_dataset = None
-                diffusion_seed = self.server.generate_seed()
+            #     synthetic_dataset = self.dataset.get_synthetic_data(round)
+            #     diffusion_seed = None
+            # else:
+            #     synthetic_dataset = None
+            #     diffusion_seed = self.server.generate_seed()
             
             # if round != 0:
             #     server_logit = self.server.generate_logits(synthetic_dataset, diffusion_seed)
             #     # Create dataloader for server logit
             #     server_logit = DataLoader(TensorDataset(server_logit), batch_size=self.kd_batch_size)
-
-            # if (self.num_devices > 1):
-            #     # Distribute server logit to clients DDP?
-   
+    
             # train each client in parallel
             for client in self.clients:
                 # Train client on local data
