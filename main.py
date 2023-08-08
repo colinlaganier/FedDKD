@@ -73,7 +73,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset-id", type=str, choices=["cifar10", "cifar100", "cinic10"], default="cifar10")
     parser.add_argument("--dataset-path", type=str, required=True)
-    parser.add_argument("--data-partition", type=str, choices=["iid", "non-iid"], default="iid")
+    parser.add_argument("--data-partition", type=str, choices=["iid", "dirichlet", "random"], default="iid")
     parser.add_argument("--synthetic-path", type=str, default=None)
     parser.add_argument("--server-model", type=str, choices=list(Models.available.keys()), default="resnet34")
     parser.add_argument("--client-model", type=str, choices=list(Models.available.keys()) + list(ClientModelStrategy.available.keys()), default="strategy_1")

@@ -1,0 +1,3 @@
+[submodule "diffusion"]
+	path = diffusion
+	url = https://github.com/colinlaganier/FederatedDiffusionModels.git

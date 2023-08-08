@@ -28,7 +28,7 @@ The baseline experiment trains the model in the conventional way.
 * To run the baseline experiment on CINIC-10 dataset with ```ResNet32``` server model and hetergeneous ```ResNet``` clients, run the following command:
 
 ```
-python main.py --dataset cifar-10 --data --model resnet32 --epochs 10 --gpu 0
+python main.py --dataset-id cinic10 --data-path dataset/cinic-10 --data-partition dirichlet --server-model resnet32 --client-model strategy_1
 ```
 
 You can change the default values of other parameters to simulate different conditions. Refer to the options section.
@@ -38,7 +38,7 @@ Training parameters and other options can be set in the ```main.py``` file. The 
 
 * ```--dataset-id:```  Name of target dataset. Default: 'cifar10'. Options: 'cifar10', 'cinc10', 'emnist'
 * ```--data-path:```    Path to the directory containing the dataset.
-* ```--data-partition:```   Dataset splitting method. Default: 'iid'. Options: 'iid', 'non-iid'
+* ```--data-partition:```   Dataset splitting method. Default: 'iid'. Options: 'iid', 'dirichlet', 'random'
 * ```--server-model:```   Model for server. Default: 'resnet32'. Options: 'resnet32', 'resnet18', 'mobilenetv3', 'shufflenetv2', 'vgg'
 * ```--client-model``` Model for server. Default: 'strategy_1'. Options: 'heterogeneous_random', 'homogeneous_random', 'homogenous', 'strategy_1', 'strategy_2' (see ```ClientModelStrategy```)
 * ```--epochs:```   Number of rounds of training. Default: 10

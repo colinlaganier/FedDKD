@@ -5,7 +5,7 @@
 /diffusion/dataset/
 /checkpoints/*
 !checkpoints/README.md
-
+/diffusion.orig
 # Tensorboard event files
 /runs/*
 !runs/README.md
