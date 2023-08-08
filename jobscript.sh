@@ -36,5 +36,4 @@ conda activate FedKDD
 nvidia-smi
 
 # Run the program
-python3 main.py --dataset-id cinic10 --dataset-path dataset/cinic-10 --data-partition iid --synthe$
---num-clients 5 --load-diffusion True --save-checkpoint True
+python3 main.py --dataset-id cinic10 --dataset-path dataset/cinic-10 --data-partition iid --synthetic-path dataset/cinic-10/10K --server-model resnet18 --client-model strategy_1 --epochs 5 --kd-epochs 5 --batch-size 128 --kd-batch-size 128 --num-rounds 100 --num-clients 5 --load-diffusion True --save-checkpoint True

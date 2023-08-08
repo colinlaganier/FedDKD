@@ -8,7 +8,7 @@ def split_dataset(num_split):
     # Get the total number of samples in the dataset
 
     data_dir = "cinic-10/valid/"
-    out_dir = "cinic-10/synthetic/"
+    out_dir = "cinic-10/10K/"
     dataset = ImageFolder(data_dir)
     num_datasets = num_split
     total_samples = len(dataset)
@@ -40,8 +40,8 @@ def split_dataset(num_split):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--num-split", type=int, default=20)
-    
+
     args = parser.parse_args()
-    
+
     split_dataset(args.num_split)
     print("Dataset successfully split")

@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import torch
 from torchvision import transforms
@@ -24,20 +25,21 @@ class Dataset:
 
         # Dataset transforms
         self.mean, self.std = self.get_stats(dataset_id)
+        self.image_size = self.get_image_size(dataset_id)
         self.train_transform = transforms.Compose([
             # transforms.Resize((32,32)),
-            transforms.RandomCrop(32, padding=4),
+            transforms.RandomCrop(self.image_size, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=self.mean, std=self.std),
         ])
         self.test_transform = transforms.Compose([
-            transforms.Resize((32,32)),
+            transforms.Resize((self.image_size,self.image_size)),
             transforms.ToTensor(),
             transforms.Normalize(mean=self.mean, std=self.std),
         ])
         self.diffusion_transform = transforms.Compose([
-            transforms.Resize((32,32)),
+            transforms.Resize((self.image_size,self.image_size)),
             transforms.ToTensor()
         ])
 
@@ -57,6 +59,12 @@ class Dataset:
             return [0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]
         elif (dataset_id == "cinic10"):
             return [0.47889522, 0.47227842, 0.43047404], [0.24205776, 0.23828046, 0.25874835]
+        
+    def get_image_size(self, dataset_id):
+        if (dataset_id in ["cifar10", "cifar100", "cinic10"]):
+            return 32   
+        elif dataset_id == "mnist":
+            return 28
         
         
     def random_split(self, dataset, num_splits):
@@ -165,6 +173,7 @@ class Dataset:
             client_data = self.dirichlet_split(training_data, self.num_clients)
 
         test_data = ImageFolder(self.data_path + "/test", transform=self.test_transform)
+        test_data = self.balanced_split(test_data, 9)[0]
         
         # Create client dataloaders
         for client in client_data:
@@ -190,7 +199,8 @@ class Dataset:
         if round is None:
             synthetic_data = ImageFolder(self.synthetic_path, transform=self.test_transform)
         else:
-            round = round % 20
+            num_partition = len(next(os.walk(self.synthetic_path))[1])
+            round = round % num_partition
             synthetic_data = ImageFolder(self.synthetic_path + "/round_" + str(round), transform=self.test_transform)
         synthetic_dataloader = DataLoader(synthetic_data, batch_size=self.kd_batch_size, shuffle=False)
         return synthetic_dataloader

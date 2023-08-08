@@ -210,8 +210,8 @@ class Scheduler:
                 logit_arr.append(client_logit)
 
                 # Save checkpoint
-                if self.save_checkpoint and self.round % 5 == 0:
-                    client.save_checkpoint()
+                # if self.save_checkpoint and self.round % 5 == 0:
+                    # client.save_checkpoint()
             print("Knowledge Distillation")
             for idx, client in enumerate(self.clients):
                 # Calculate teacher logits for client
