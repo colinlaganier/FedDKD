@@ -41,8 +41,8 @@ class Client:
         else:
             self.kd_scheduling = None
 
-    def get_alpha(self, x):
-        return round(self.kd_scheduling(x), 2)
+    def get_alpha(self):
+        return round(self.kd_scheduling(self.round), 2)
 
     def constant(self, x):
         return 0.5
@@ -168,6 +168,13 @@ class Client:
                 cls_loss = criterion(output, target)
                 loss = (1 - self.params["kd_alpha"]) * cls_loss + self.params["kd_alpha"] * kd_loss
                 
+                # Knowledge distillation alpha scheduling
+                if self.kd_scheduling is not None: 
+                    alpha = self.get_alpha()
+                    loss = (1 - alpha) * cls_loss + alpha * kd_loss
+                else:
+                    loss = (1 - self.params["kd_alpha"]) * cls_loss + self.params["kd_alpha"] * kd_loss
+
                 # Adaptive loss
                 # max_loss = torch.max(cls_loss, kd_loss)
                 # min_loss = torch.min(cls_loss, kd_loss)
@@ -226,7 +233,7 @@ class Client:
                 
                 # Knowledge distillation alpha scheduling
                 if self.kd_scheduling is not None: 
-                    alpha = self.get_alpha(self.round)
+                    alpha = self.get_alpha()
                     loss = (1 - alpha) * local_loss + alpha * kd_loss
                 else:
                     loss = (1 - self.params["kd_alpha"]) * local_loss + self.params["kd_alpha"] * kd_loss
