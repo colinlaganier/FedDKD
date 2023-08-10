@@ -101,7 +101,7 @@ class Server:
                 # Compute loss
                 kd_loss = kd_criterion(output, logit)
                 cls_loss = criterion(output, target)
-                loss = (1 - self.params["kd_alpha"]) * cls_loss + self.params["kd_alpha"] * kd_loss
+                loss = (1 - self.params["kd_alpha_server"]) * cls_loss + self.params["kd_alpha_server"] * kd_loss
                 
                 kd_total_loss += kd_loss.item()
                 cls_total_loss += loss.item()
@@ -155,7 +155,7 @@ class Server:
     #                 # Compute loss
     #                 kd_loss = kd_criterion(output, logit)
     #                 cls_loss = criterion(output, target)
-    #                 loss = (1 - self.params["kd_alpha"]) * cls_loss + self.params["kd_alpha"] * kd_loss
+    #                 loss = (1 - self.params["kd_alpha_server"]) * cls_loss + self.params["kd_alpha_server"] * kd_loss
                     
     #                 kd_total_loss += kd_loss.item()
     #                 cls_total_loss += loss.item()

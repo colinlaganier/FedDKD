@@ -27,9 +27,10 @@ class Dataset:
         self.mean, self.std = self.get_stats(dataset_id)
         self.image_size = self.get_image_size(dataset_id)
         self.train_transform = transforms.Compose([
-            # transforms.Resize((32,32)),
+            # transforms.Resize(32),
             transforms.RandomCrop(self.image_size, padding=4),
             transforms.RandomHorizontalFlip(),
+            # transforms.TrivialAugmentWide(),
             transforms.ToTensor(),
             transforms.Normalize(mean=self.mean, std=self.std),
         ])

@@ -10,6 +10,7 @@ from models.Models import Models
 from models.ClientModelStrategy import ClientModelStrategy
 from federated.Scheduler import Scheduler
 from torch.utils.tensorboard import SummaryWriter
+from functools import partial
 
 def main(args, checkpoint_path, logger):
     """
@@ -51,7 +52,7 @@ def main(args, checkpoint_path, logger):
 
     scheduler.train(args.num_rounds)
 
-def handler(signum, frame):
+def handler(save_checkpoint, signum, frame):
     """
     Handler for terminating the program with Ctrl-C
 
@@ -59,16 +60,14 @@ def handler(signum, frame):
         signum (int): signal number
         frame (frame): current stack frame
     """
-    res = input("Ctrl-C was pressed. Do you want to save client and server checkpoints y/n ")
-    if res == 'y':
-        scheduler.save_checkpoints()
-        print("Saved client and server checkpoints")
+    if save_checkpoint:
+        res = input("Ctrl-C was pressed. Do you want to save client and server checkpoints y/n ")
+        if res == 'y':
+            scheduler.save_checkpoints()
+            print("Saved client and server checkpoints")
     exit(1)
 
 if __name__ == "__main__":
-    # Register handler for termination
-    signal.signal(signal.SIGINT, handler)
-
     # Parse command line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset-id", type=str, choices=["cifar10", "cifar100", "cinic10"], default="cifar10")
@@ -84,10 +83,13 @@ if __name__ == "__main__":
     parser.add_argument("--kd-batch-size", type=int, default=32)
     parser.add_argument("--num-rounds", type=int, default=10)
     parser.add_argument("--num-clients", type=int, default=2)
-    parser.add_argument("--load-diffusion", type=bool, default=True)
-    parser.add_argument("--save-checkpoint", type=bool, default=False)
+    parser.add_argument("--load-diffusion", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--save-checkpoint", action=argparse.BooleanOptionalAction)
 
     args = parser.parse_args()
+
+    # Register handler for termination
+    signal.signal(signal.SIGINT, partial(handler, args.save_checkpoint))
 
     # Check if CUDA is available
     assert torch.cuda.is_available(), "CUDA is not available"

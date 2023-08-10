@@ -69,10 +69,12 @@ class Scheduler:
                                 "kd_lr": 0.01,
                                 "kd_momentum": 0.9,
                                 "kd_alpha": 0.8,
+                                "kd_alpha_server": 0.8,
                                 "kd_temperature": 4,
                                 "kd_epochs": self.kd_epochs,
                                 "kd_batch_size": self.kd_batch_size,
-                                "eval_seed": self.eval_seed}
+                                "eval_seed": self.eval_seed,
+                                "kd_scheduling": None}
 
         # Setup datasets
         self.dataset = Dataset(data_path, dataset_id, batch_size, kd_batch_size, num_clients, synthetic_path)
@@ -149,7 +151,8 @@ class Scheduler:
         # train each client on local data 
         for client in self.clients:
             client.init_client()
-        self.save_checkpoints()
+        if self.save_checkpoint:
+            self.save_checkpoints()
 
     def train(self, num_rounds, logit_ensemble=True):
         """
@@ -169,7 +172,7 @@ class Scheduler:
         for round in range(num_rounds):
             print("Round {}".format(round))
             self.round += 1
-            logit_arr = []
+            logit_arr.clear()
 
             # Generate server logit
             # if self.load_diffusion:
@@ -196,22 +199,12 @@ class Scheduler:
                 client.train()
                 client.evaluate(self.dataset.test_dataloader)
 
-                # Knowledge distillation with server logit and synthetic diffusion data
-                # if self.load_diffusion:   
-                #     client.set_synthetic_dataset(synthetic_dataset)
-                # if round != 0:
-                #     print("Knowledge distillation")
-                #     client.knowledge_distillation(server_logit, synthetic_dataset, diffusion_seed)
-                #     client.evaluate(self.dataset.test_dataloader, True)
-
                 # Generate logit for server update
-                client_logit = client.generate_logits(synthetic_dataset, diffusion_seed)
-                # logit_queue.put(client_logit)
-                logit_arr.append(client_logit)
+                logit_arr.append(client.generate_logits(synthetic_dataset, diffusion_seed))
 
                 # Save checkpoint
                 # if self.save_checkpoint and self.round % 5 == 0:
-                    # client.save_checkpoint()
+                #     client.save_checkpoint()
             print("Knowledge Distillation")
             for idx, client in enumerate(self.clients):
                 # Calculate teacher logits for client
@@ -226,10 +219,51 @@ class Scheduler:
             self.server.knowledge_distillation(client_logits, synthetic_dataset, diffusion_seed)
             self.server.evaluate(self.dataset.test_dataloader)
 
-        # Save checkpoint
-        for client in self.clients:
-            client.save_checkpoint()
-        self.server.save_checkpoint()
+            # Save checkpoint
+            if self.save_checkpoint and self.round % 5 == 0:
+                self.save_checkpoints()
+
+    def train_combine(self,num_rounds):
+        logit_arr = []
+        # synthetic_dataset = self.synthetic_dataset
+        diffusion_seed = None
+        # synthetic_dataset = self.dataset.get_synthetic_data(None)
+
+        print("Training network for {} communication rounds".format(num_rounds))
+    
+        for round in range(num_rounds):
+            print("Round {}".format(round))
+            synthetic_dataset = self.dataset.get_synthetic_data(round)
+
+            if self.round == 0:
+                for client in self.clients:
+                    logit_arr.append(client.generate_logits(synthetic_dataset, diffusion_seed))
+
+            for idx, client in enumerate(self.clients):
+                # Train client on local data
+                print("Client {}".format(client.id))
+                # print("Training")
+                teacher_logits = torch.mean(torch.stack(logit_arr[:idx] + logit_arr[idx + 1:]), dim=0)
+                teacher_logits = DataLoader(TensorDataset(teacher_logits), batch_size=self.kd_batch_size)
+                client.train_kd(teacher_logits, synthetic_dataset, diffusion_seed)
+                client.evaluate(self.dataset.test_dataloader)
+
+            logit_arr.clear()
+            for client in self.clients:
+                # Generate logit for server update
+                logit_arr.append(client.generate_logits(synthetic_dataset, diffusion_seed))
+
+            print("Server")
+            client_logits = torch.mean(torch.stack(logit_arr), dim=0)
+            # Update server model with client logits
+            self.server.knowledge_distillation(client_logits, synthetic_dataset, diffusion_seed)
+            self.server.evaluate(self.dataset.test_dataloader)
+
+            if self.save_checkpoint and self.round % 5 == 0:
+                self.save_checkpoints()
+
+            self.round += 1
+
 
     def train_phases(self, num_rounds):
         """
