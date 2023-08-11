@@ -264,6 +264,56 @@ class Scheduler:
 
             self.round += 1
 
+    # def train_phases(self, num_rounds, logit_ensemble=True):
+    #     """
+    #     Train client models on local data and perform co-distillation
+        
+    #     Args:
+    #         num_rounds (int): number of rounds to train
+    #         logit_ensemble (bool): whether to perform logit ensemble
+    #     """
+    #     # logit_queue = Queue()
+    #     logit_arr = []
+    #     synthetic_dataset = self.synthetic_dataset
+    #     diffusion_seed = None
+
+    #     print("Training network for {} communication rounds".format(num_rounds))
+
+    #     for round in range(num_rounds):
+    #         print("Round {}".format(round))
+    #         self.round += 1
+    #         logit_arr.clear()
+    
+    #         # train each client in parallel
+    #         for client in self.clients:
+    #             # Train client on local data
+    #             print("Client {}".format(client.id))
+    #             print("Training")
+    #             client.train()
+    #             client.evaluate(self.dataset.test_dataloader)
+                                    
+    #             # Generate logit for server update
+    #             logit_arr.append(client.generate_logits(synthetic_dataset, diffusion_seed))
+
+    #             # Save checkpoint
+    #             # if self.save_checkpoint and self.round % 5 == 0:
+    #             #     client.save_checkpoint()
+    #         print("Knowledge Distillation")
+    #         for idx, client in enumerate(self.clients):
+    #             # Calculate teacher logits for client
+    #             teacher_logits = torch.mean(torch.stack(logit_arr[:idx] + logit_arr[idx + 1:]), dim=0)
+    #             teacher_logits = DataLoader(TensorDataset(teacher_logits), batch_size=self.kd_batch_size)
+    #             client.knowledge_distillation(teacher_logits, synthetic_dataset, diffusion_seed)
+
+    #         # self.server.aggregate_logits(logit_queue)
+    #         client_logits = torch.mean(torch.stack(logit_arr), dim=0)
+    #         # Update server model with client logits
+    #         self.server.knowledge_distillation(client_logits, synthetic_dataset, diffusion_seed)
+    #         self.server.evaluate(self.dataset.test_dataloader)
+
+    #         # Save checkpoint
+    #         if self.save_checkpoint and self.round % 5 == 0:
+    #             self.save_checkpoints()
 
     def train_phases(self, num_rounds):
         """

@@ -28,6 +28,7 @@ class Client:
         self.synthetic_dataset = None
         self.epochs = None
         self.params = params
+        self.kd_alpha = None
         self.strategies = {
             0: self.constant,
             1: self.linear,
@@ -152,6 +153,11 @@ class Client:
         kd_total_loss = 0
         total_loss = 0
 
+        if self.kd_scheduling is not None: 
+            alpha = self.get_alpha()
+        else:
+            alpha = self.params["kd_alpha"]
+
         for epoch in range(self.params["kd_epochs"]):
             kd_total_loss = 0
             cls_total_loss = 0
@@ -172,8 +178,7 @@ class Client:
                 if self.kd_scheduling is not None: 
                     alpha = self.get_alpha()
                     loss = (1 - alpha) * cls_loss + alpha * kd_loss
-                else:
-                    loss = (1 - self.params["kd_alpha"]) * cls_loss + self.params["kd_alpha"] * kd_loss
+
 
                 # Adaptive loss
                 # max_loss = torch.max(cls_loss, kd_loss)
