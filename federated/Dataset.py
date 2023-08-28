@@ -173,23 +173,31 @@ class Dataset:
         """
         Loads data from data_path and splits into client and test dataloader
         """
-        # Load image data and split into client datasets
         
         if self.dataset_id == "emnist":
+            # Load EMNIST dataset from torchvision
             training_data = EMNIST(root='./dataset', train=True, download=True, transform=self.train_transform, split='digits')
             test_data = EMNIST(root='./dataset', train=False, download=True, transform=self.train_transform, split='digits')
-            print(len(training_data))
+
             # Reduce test set to 10,000 images for consistency
             test_split = self.balanced_split(test_data, 4)
             test_data = test_split[0]
-            self.synthetic_dataset = test_split[1:]
+
+            if self.synthetic_path:
+                print("Loading synthetic data from {}".format(self.synthetic_path))
+                # Load pre-generated synthetic dataset
+                synthetic_data = ImageFolder(self.synthetic_path, transform=self.test_transform)
+                self.synthetic_dataset = self.balanced_split(synthetic_data, 10)
+            else:
+                # Use EMNIST test set as synthetic dataset
+                self.synthetic_dataset = test_split[1:]
+
         elif self.dataset_id == "cinic10":
             training_data = ImageFolder(self.data_path + "/train", transform=self.train_transform)
             test_data = ImageFolder(self.data_path + "/test", transform=self.test_transform)
+
             # Reduce test set to 10,000 images for consistency
             test_data = self.balanced_split(test_data, 9)[0]
-            # if self.synthetic_path == "cinic10":
-            #     assert len(training_data) == 90000
         
         # Split training data into client datasets based on partition strategy
         if (partition == "iid"):
@@ -228,7 +236,10 @@ class Dataset:
             if round is None:
                 synthetic_data = self.synthetic_dataset[0]
             else:
-                round = round % 3
+                if self.synthetic_path:
+                    round = round % 10
+                else: 
+                    round = round % 3
                 synthetic_data = self.synthetic_dataset[round]
         else: 
             if round is None:
