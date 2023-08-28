@@ -8,7 +8,7 @@ import numpy as np
 
 class Client:
 
-    def __init__(self, client_id, device, model, dataloader, params, checkpoint_path, logger):
+    def __init__(self, client_id, device, model, dataloader, dataset_id, params, checkpoint_path, logger):
         # Client properties
         self.id = client_id
         self.logger = logger
@@ -16,6 +16,8 @@ class Client:
         self.round = -1 # ignore initial round
 
         self.dataloader = dataloader
+        self.dataset_id = dataset_id
+
         self.model = model
         # self.model = deepcopy(model).to(self.gpu_id)
         self.criterion = None
@@ -60,7 +62,7 @@ class Client:
     def sigmoid(self, x, shift):
         return 0.8 / (1 + np.exp(-0.2 * (x - shift)))
 
-    def init_client(self):
+    def init_client(self, load_checkpoint=False):
         """
         Initialize the client model training process
         """
@@ -72,7 +74,8 @@ class Client:
 
         torch.manual_seed(self.id)
         # self.model = self.model(weights=None, num_classes=self.params["num_classes"])
-        self.model = self.model(self.params["num_classes"])
+        num_channels = 3 if self.dataset_id == "cinic10" else 1
+        self.model = self.model(num_channels, self.params["num_classes"])
         if torch.cuda.device_count() > 1:
             print("Using multiple GPUs")
             self.model = nn.DataParallel(self.model)
@@ -80,11 +83,17 @@ class Client:
         self.optimizer = self.params["optimizer"](self.model.parameters(),
                                              lr=self.params["lr"], 
                                              momentum=self.params["momentum"],
-                                             weight_decay=self.params["weight_decay"])
+                                            #  weight_decay=self.params["weight_decay"]
+                                             )
         self.criterion = self.params["criterion"]().to(self.device)
-        self.train()
+        if load_checkpoint:
+            self.load_checkpoint(f"checkpoints/pretrain/client_0{self.id}.pt")
+            # self.train(epochs=1)
+        else:
+            print(self.params["pretrain_epochs"])
+            self.train(epochs=self.params["pretrain_epochs"])
 
-    def train(self):
+    def train(self, epochs=None):
         """
         Train the client model
         """
@@ -93,7 +102,7 @@ class Client:
         self.model.train()
         self.round += 1
 
-        num_epochs = self.params["epochs"] * 2.5 if round == 0 else self.params["epochs"]
+        num_epochs = epochs if epochs else self.params["epochs"]
 
         for epoch in range(num_epochs):
                     # Set statistic variables
@@ -119,9 +128,13 @@ class Client:
                 _, predicted = torch.max(output.data, 1)
                 total_correct += (predicted == target).sum().item()
                     
+            # past_epochs = epoch + epochs if self.round == 0 else epoch
             # Log statistics
-            self.logger.add_scalar(f"Training_Loss/Client_{self.id:02}", total_loss/len(self.dataloader), self.round * self.params["epochs"] + epoch)
-            self.logger.add_scalar(f"Training_Accuracy/Client_{self.id:02}", 100*total_correct/total, self.round * self.params["epochs"] + epoch)
+            self.logger.add_scalar(f"Training_Loss/Client_{self.id:02}", total_loss/len(self.dataloader), (self.round - 1) * self.params["epochs"] + epoch + self.params["pretrain_epochs"])
+            self.logger.add_scalar(f"Training_Accuracy/Client_{self.id:02}", 100*total_correct/total, (self.round - 1) * self.params["epochs"] + epoch + self.params["pretrain_epochs"])
+
+        # if self.round == 0:
+        #     self.save_checkpoint("checkpoints/pretrain")
         
         self.logger.flush()
 
@@ -144,7 +157,7 @@ class Client:
         # self.model.to(self.device)
         self.model.train()
 
-        optimizer = self.params["kd_optimizer"](self.model.parameters(), lr=self.params["kd_lr"], momentum=self.params["kd_momentum"])
+        # optimizer = self.params["kd_optimizer"](self.model.parameters(), lr=self.params["kd_lr"], momentum=self.params["kd_momentum"])
 
         kd_criterion = self.params["kd_criterion"](self.params["kd_temperature"]).to(self.device)
         criterion = self.params["criterion"]().to(self.device)
@@ -166,7 +179,7 @@ class Client:
                 logit = logit[0]
                 data, target, logit = data.to(self.device), target.to(self.device), logit.to(self.device)
                 
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
 
                 output = self.model(data)
 
@@ -190,14 +203,14 @@ class Client:
                 cls_total_loss += loss.item()
 
                 loss.backward()
-                optimizer.step()
+                self.optimizer.step()
 
             # Log statistics
             self.logger.add_scalar(f"KD_Loss/Client_{self.id:02}", kd_total_loss/len(synthetic_data), self.round * self.params["kd_epochs"] + epoch)
             self.logger.add_scalar(f"KD_Class_Loss/Client_{self.id:02}", cls_total_loss/len(synthetic_data), self.round * self.params["kd_epochs"] + epoch)
 
         self.logger.flush()
-        del optimizer, kd_criterion, criterion
+        # del optimizer, kd_criterion, criterion
 
 
     def train_kd(self, teacher_logits, synthetic_data=None, diffusion_seed=None):
@@ -326,15 +339,17 @@ class Client:
             self.logger.add_scalar(f"Validation_Accuracy/Client_{self.id:02}", 100*total_correct/total, self.round)
             self.logger.flush()
 
-    def save_checkpoint(self):
+    def save_checkpoint(self, checkpoint_path = None):
         """
         Save the client model checkpoint
         """
+        path = checkpoint_path if checkpoint_path is not None else self.checkpoint_path
+
         torch.save({
             'round': self.round,
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict()
-            }, self.checkpoint_path + f"/client_{self.id:02}.pt")
+            }, path + f"/client_{self.id:02}.pt")
         
     def load_checkpoint(self, checkpoint):
         """

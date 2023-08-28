@@ -142,6 +142,7 @@ class ResNet(nn.Module):
         block: Type[Union[BasicBlock, Bottleneck]],
         layers: List[int],
         num_classes: int = 1000,
+        num_channels: int = 3,
         zero_init_residual: bool = False,
         groups: int = 1,
         width_per_group: int = 64,
@@ -167,7 +168,7 @@ class ResNet(nn.Module):
             )
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv1 = nn.Conv2d(num_channels, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -257,21 +258,21 @@ class ResNet(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         return self._forward_impl(x)
 
-def ResNet18(num_classes):
-    return ResNet(BasicBlock, [2, 2, 2, 2], num_classes)
+def ResNet18(num_channels, num_classes):
+    return ResNet(BasicBlock, [2, 2, 2, 2], num_classes, num_channels)
 
 
-def ResNet34(num_classes):
-    return ResNet(BasicBlock, [3, 4, 6, 3], num_classes)
+def ResNet34(num_channels, num_classes):
+    return ResNet(BasicBlock, [3, 4, 6, 3], num_classes, num_channels)
 
 
-def ResNet50(num_classes):
-    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes)
+def ResNet50(num_channels, num_classes):
+    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes, num_channels)
 
 
-def ResNet101(num_classes):
-    return ResNet(Bottleneck, [3, 4, 23, 3], num_classes)
+def ResNet101(num_channels, num_classes):
+    return ResNet(Bottleneck, [3, 4, 23, 3], num_classes, num_channels)
 
 
-def ResNet152(num_classes):
-    return ResNet(Bottleneck, [3, 8, 36, 3], num_classes)
+def ResNet152(num_channels, num_classes):
+    return ResNet(Bottleneck, [3, 8, 36, 3], num_classes, num_channels)

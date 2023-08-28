@@ -5,13 +5,14 @@ import random
 
 class Server:
     
-    def __init__(self, device, model, params, checkpoint_path, logger):
+    def __init__(self, device, model, dataset_id, params, checkpoint_path, logger):
         # Server properties
         self.device = device
         self.logger = logger
         self.checkpoint_path = checkpoint_path
         self.seed = 42
         self.round = 0
+        self.dataset_id = dataset_id
 
         # Server model properties
         self.model = model
@@ -31,7 +32,8 @@ class Server:
         torch.manual_seed(self.seed)
 
         # self.model = self.model(weights=None, num_classes=self.params["num_classes"])
-        self.model = self.model(self.params["num_classes"])
+        num_channels = 3 if self.dataset_id == "cinic10" else 1
+        self.model = self.model(num_channels, self.params["num_classes"])
         if torch.cuda.device_count() > 1: 
             print("Using multiple GPUs")
             self.model = nn.DataParallel(self.model)
@@ -81,12 +83,12 @@ class Server:
         self.round += 1
 
         client_logit = DataLoader(TensorDataset(client_logits), batch_size=self.params["kd_batch_size"], num_workers=4)
-        optimizer = self.params["kd_optimizer"](self.model.parameters(), lr=self.params["kd_lr"], momentum=self.params["kd_momentum"])
+        # optimizer = self.params["kd_optimizer"](self.model.parameters(), lr=self.params["kd_lr"], momentum=self.params["kd_momentum"])
 
         kd_criterion = self.params["kd_criterion"](self.params["kd_temperature"]).to(self.device)
         criterion = self.params["criterion"]().to(self.device)
 
-        for epoch in range(self.params["kd_epochs"]):
+        for epoch in range(self.params["kd_epochs_server"]):
             kd_total_loss = 0
             cls_total_loss = 0
 
@@ -107,14 +109,14 @@ class Server:
                 cls_total_loss += loss.item()
 
                 loss.backward()
-                optimizer.step()
+                self.optimizer.step()
             
             # Log statistics
-            self.logger.add_scalar("KD_Loss/Server", kd_total_loss/len(synthetic_data), self.round * self.params["kd_epochs"] + epoch)
-            self.logger.add_scalar("KD_Class_Loss/Server", cls_total_loss/len(synthetic_data), self.round * self.params["kd_epochs"] + epoch)
+            self.logger.add_scalar("KD_Loss/Server", kd_total_loss/len(synthetic_data), self.round * self.params["kd_epochs_server"] + epoch)
+            self.logger.add_scalar("KD_Class_Loss/Server", cls_total_loss/len(synthetic_data), self.round * self.params["kd_epochs_server"] + epoch)
 
         self.logger.flush()
-        del optimizer, kd_criterion, criterion
+        # del optimizer, kd_criterion, criterion
 
 
     # def knowledge_distillation(self, synthetic_data=None, diffusion_seed=None):

@@ -59,7 +59,7 @@ class Scheduler:
         self.training_params = {"num_classes": 10,
                                 "optimizer": optim.SGD, 
                                 "criterion": nn.CrossEntropyLoss, 
-                                "lr": 0.1 , 
+                                "lr": 0.01 , 
                                 "momentum": 0.9, 
                                 "epochs": self.train_epochs,
                                 "weight_decay": 1e-4, 
@@ -68,15 +68,18 @@ class Scheduler:
                                 "kd_criterion": SoftTarget,
                                 "kd_lr": 0.01,
                                 "kd_momentum": 0.9,
-                                "kd_alpha": 0.8,
+                                "kd_alpha": 0.9,
                                 "kd_alpha_server": 0.8,
                                 "kd_temperature": 4,
                                 "kd_epochs": self.kd_epochs,
+                                "kd_epochs_server": 5,
+                                "pretrain_epochs": 15,
                                 "kd_batch_size": self.kd_batch_size,
                                 "eval_seed": self.eval_seed,
                                 "kd_scheduling": None}
 
         # Setup datasets
+        self.dataset_id = dataset_id
         self.dataset = Dataset(data_path, dataset_id, batch_size, kd_batch_size, num_clients, synthetic_path)
         self.dataset.prepare_data(data_partition)
         # self.dataset.synthetic_dataset_test()
@@ -91,7 +94,7 @@ class Scheduler:
         self.assign_devices()
 
         # Setup server and initialize
-        self.server = Server(self.server_device, self.server_model(), self.training_params, self.checkpoint_path, self.logger)
+        self.server = Server(self.server_device, self.server_model(), self.dataset_id, self.training_params, self.checkpoint_path, self.logger)
         # self.server.init_server(self.synthetic_dataset, pre_train=True)
         # self.server.init_server(self.dataset.get_synthetic_train(), pre_train=True)
         self.server.init_server()
@@ -140,6 +143,7 @@ class Scheduler:
                                         self.client_devices[client_id], 
                                         self.client_models[client_id](), 
                                         self.dataset.client_dataloaders[client_id],
+                                        self.dataset_id,
                                         self.training_params,
                                         self.checkpoint_path,
                                         self.logger)        
@@ -151,8 +155,16 @@ class Scheduler:
         # train each client on local data 
         for client in self.clients:
             client.init_client()
+            client.evaluate(self.dataset.test_dataloader)
         if self.save_checkpoint:
             self.save_checkpoints()
+
+    def train_baseline(self, num_epochs=15):
+        for client in self.clients:
+            print("Client {}".format(client.id))
+            for epoch in range(num_epochs):
+                client.train(epochs=1)
+                client.evaluate(self.dataset.test_dataloader)
 
     def train(self, num_rounds, logit_ensemble=True):
         """
@@ -173,6 +185,8 @@ class Scheduler:
             print("Round {}".format(round))
             self.round += 1
             logit_arr.clear()
+
+            synthetic_dataset = self.dataset.get_synthetic_data(round)
 
             # Generate server logit
             # if self.load_diffusion:

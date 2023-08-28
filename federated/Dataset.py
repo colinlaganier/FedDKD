@@ -5,6 +5,7 @@ from torchvision import transforms
 from torchvision.transforms import ToTensor
 from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader, Subset, random_split
+from torchvision.datasets import EMNIST
 
 class Dataset:
 
@@ -17,6 +18,7 @@ class Dataset:
         self.kd_batch_size = kd_batch_size
         self.equal_split = True
         self.client_dataloaders = []
+        self.client_pretrain_dataloader = []
         self.test_dataloader = None
         self.num_classes = 10 if (dataset_id == "cifar10") else 100
         self.synthetic_dataset = []
@@ -26,14 +28,22 @@ class Dataset:
         # Dataset transforms
         self.mean, self.std = self.get_stats(dataset_id)
         self.image_size = self.get_image_size(dataset_id)
-        self.train_transform = transforms.Compose([
-            # transforms.Resize(32),
-            transforms.RandomCrop(self.image_size, padding=4),
-            transforms.RandomHorizontalFlip(),
-            # transforms.TrivialAugmentWide(),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=self.mean, std=self.std),
-        ])
+        if (dataset_id == "cinic10"):
+            self.train_transform = transforms.Compose([
+                # transforms.Resize(32),
+                transforms.RandomCrop(self.image_size, padding=4),
+                transforms.RandomHorizontalFlip(),
+                # transforms.TrivialAugmentWide(),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=self.mean, std=self.std),
+            ])
+        elif (dataset_id == "emnist"):
+            self.train_transform = transforms.Compose([
+                lambda img: transforms.functional.rotate(img, -90),
+                lambda img: transforms.functional.hflip(img),
+                transforms.Resize(32),
+                transforms.ToTensor(),
+                transforms.Normalize([0.5], [0.5])])
         self.test_transform = transforms.Compose([
             transforms.Resize((self.image_size,self.image_size)),
             transforms.ToTensor(),
@@ -60,6 +70,8 @@ class Dataset:
             return [0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]
         elif (dataset_id == "cinic10"):
             return [0.47889522, 0.47227842, 0.43047404], [0.24205776, 0.23828046, 0.25874835]
+        elif (dataset_id == "emnist"):
+            return [0.5], [0.5]
         
     def get_image_size(self, dataset_id):
         if (dataset_id in ["cifar10", "cifar100", "cinic10"]):
@@ -123,7 +135,7 @@ class Dataset:
         Returns:
             client_data (list): list of client datasets       
         """
-
+        np.random.seed(42)
         label_distributions = []
         # Generate label distributions for each class using Dirichlet distribution
         for y in range(len(dataset.classes)):
@@ -162,9 +174,23 @@ class Dataset:
         Loads data from data_path and splits into client and test dataloader
         """
         # Load image data and split into client datasets
-        training_data = ImageFolder(self.data_path + "/train", transform=self.train_transform)
-        if self.synthetic_path == "cinic10":
-            assert len(training_data) == 90000
+        
+        if self.dataset_id == "emnist":
+            training_data = EMNIST(root='./dataset', train=True, download=True, transform=self.train_transform, split='digits')
+            test_data = EMNIST(root='./dataset', train=False, download=True, transform=self.train_transform, split='digits')
+            print(len(training_data))
+            # Reduce test set to 10,000 images for consistency
+            test_split = self.balanced_split(test_data, 4)
+            test_data = test_split[0]
+            self.synthetic_dataset = test_split[1:]
+        elif self.dataset_id == "cinic10":
+            training_data = ImageFolder(self.data_path + "/train", transform=self.train_transform)
+            test_data = ImageFolder(self.data_path + "/test", transform=self.test_transform)
+            # Reduce test set to 10,000 images for consistency
+            test_data = self.balanced_split(test_data, 9)[0]
+            # if self.synthetic_path == "cinic10":
+            #     assert len(training_data) == 90000
+        
         # Split training data into client datasets based on partition strategy
         if (partition == "iid"):
             client_data = self.balanced_split(training_data, self.num_clients)
@@ -173,12 +199,13 @@ class Dataset:
         elif (partition == "dirichlet"):
             client_data = self.dirichlet_split(training_data, self.num_clients)
 
-        test_data = ImageFolder(self.data_path + "/test", transform=self.test_transform)
-        test_data = self.balanced_split(test_data, 9)[0]
-        
         # Create client dataloaders
         for client in client_data:
-            self.client_dataloaders.append(DataLoader(client, batch_size=self.batch_size, shuffle=True))
+            # self.client_pretrain_dataloader.append(DataLoader(client, batch_size=self.pretrain_batch_size, shuffle=True))
+            self.client_dataloaders.append(DataLoader(client, batch_size=self.batch_size, shuffle=True, drop_last=True))
+        
+        for i in range(len(self.client_dataloaders)):
+            print("Client {} size: {}".format(i, len(self.client_dataloaders[i].dataset)))
         
         # Create test dataloader
         self.test_dataloader = DataLoader(test_data, batch_size=self.batch_size, shuffle=False)
@@ -197,12 +224,19 @@ class Dataset:
         """
         Loads synthetic data from synthetic_folder
         """
-        if round is None:
-            synthetic_data = ImageFolder(self.synthetic_path, transform=self.test_transform)
-        else:
-            num_partition = len(next(os.walk(self.synthetic_path))[1])
-            round = round % num_partition
-            synthetic_data = ImageFolder(self.synthetic_path + "/round_" + str(round), transform=self.test_transform)
+        if self.dataset_id == "emnist":
+            if round is None:
+                synthetic_data = self.synthetic_dataset[0]
+            else:
+                round = round % 3
+                synthetic_data = self.synthetic_dataset[round]
+        else: 
+            if round is None:
+                synthetic_data = ImageFolder(self.synthetic_path, transform=self.test_transform)
+            else:
+                num_partition = len(next(os.walk(self.synthetic_path))[1])
+                round = round % num_partition
+                synthetic_data = ImageFolder(self.synthetic_path + "/round_" + str(round), transform=self.test_transform)
         synthetic_dataloader = DataLoader(synthetic_data, batch_size=self.kd_batch_size, shuffle=False)
         return synthetic_dataloader
     

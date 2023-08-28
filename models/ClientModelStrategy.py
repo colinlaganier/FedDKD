@@ -23,8 +23,13 @@ class ClientModelStrategy:
     def strategy_2(num_clients):
         return [Models.MobileNetV3] * (num_clients // 2) + [Models.ShuffleNetV2] * (num_clients - (num_clients // 2))
     
+    @staticmethod
+    def cnn_1(num_clients):
+        return [Models.CNN_small]  + [Models.CNN_medium] * 2 + [Models.CNN_large] * (num_clients - 3)
+    
     available = {"heterogeneous_random" : heterogeneous_random,
                  "homogeneous_random" : heterogeneous_random,
                  "homogenous" : homogenous,
                  "strategy_1" : strategy_1,
-                 "strategy_2" : strategy_2}
+                 "strategy_2" : strategy_2,
+                 "cnn_1": cnn_1}

@@ -6,6 +6,7 @@
 /checkpoints/*
 !checkpoints/README.md
 /diffusion.orig
+/baseline
 # Tensorboard event files
 /runs/*
 !runs/README.md
