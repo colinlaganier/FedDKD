@@ -51,6 +51,7 @@ def main(args, checkpoint_path, logger):
                           logger)
 
     scheduler.train(args.num_rounds)
+    # scheduler.train_baseline()
 
 def handler(save_checkpoint, signum, frame):
     """
@@ -70,8 +71,8 @@ def handler(save_checkpoint, signum, frame):
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset-id", type=str, choices=["cifar10", "cifar100", "cinic10"], default="cifar10")
-    parser.add_argument("--dataset-path", type=str, required=True)
+    parser.add_argument("--dataset-id", type=str, required=True, choices=["cinic10", "emnist"], default="emnist")
+    parser.add_argument("--dataset-path", type=str, default=None)
     parser.add_argument("--data-partition", type=str, choices=["iid", "dirichlet", "random"], default="iid")
     parser.add_argument("--synthetic-path", type=str, default=None)
     parser.add_argument("--server-model", type=str, choices=list(Models.available.keys()), default="resnet34")
@@ -88,6 +89,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    if (args.dataset_id == "cinic10"):
+        assert args.dataset_path is not None, "Dataset path must be specified for cinic10"
+
     # Register handler for termination
     signal.signal(signal.SIGINT, partial(handler, args.save_checkpoint))
 
@@ -97,6 +101,7 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = False
 
     # Create tensorboard writer
+    # log_dir=f"runs/EMNIST_Real_iid_ResNet"
     logger = SummaryWriter()
 
     # Create checkpoint directory for run
