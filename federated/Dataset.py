@@ -194,9 +194,9 @@ class Dataset:
                 synthetic_data = ImageFolder(self.synthetic_path, transform=self.synthetic_transform)
                 print("Synthetic data size: {}".format(len(synthetic_data)))
                 self.synthetic_dataset = self.balanced_split(synthetic_data, 10)
-            else:
-                # Use EMNIST test set as synthetic dataset
-                self.synthetic_dataset = test_split[1:]
+            # else:
+            #     # Use EMNIST test set as synthetic dataset
+            #     self.synthetic_dataset = test_split[1:]
 
         elif self.dataset_id == "cinic10":
             training_data = ImageFolder(self.data_path + "/train", transform=self.train_transform)

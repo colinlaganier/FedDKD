@@ -98,7 +98,7 @@ class Scheduler:
 
         # Loading Diffusion Model
         self.diffusion_model = None
-        if load_diffusion == False:
+        if not load_diffusion:
             self.init_DM(synthetic_path)
 
         # Setup server and initialize
