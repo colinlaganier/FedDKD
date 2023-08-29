@@ -44,8 +44,12 @@ class Dataset:
                 transforms.Resize(32),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5], [0.5])])
+            self.synthetic_transform = transforms.Compose([
+                transforms.ToTensor(),
+                lambda img: img[0,:,:].unsqueeze(0),
+                transforms.Normalize(mean=self.mean, std=self.std),
+            ])
         self.test_transform = transforms.Compose([
-            transforms.Resize((self.image_size,self.image_size)),
             transforms.ToTensor(),
             transforms.Normalize(mean=self.mean, std=self.std),
         ])
@@ -169,7 +173,7 @@ class Dataset:
         return subsets
 
 
-    def prepare_data(self, partition):
+    def prepare_data(self, partition, load_diffusion):
         """
         Loads data from data_path and splits into client and test dataloader
         """
@@ -183,10 +187,12 @@ class Dataset:
             test_split = self.balanced_split(test_data, 4)
             test_data = test_split[0]
 
-            if self.synthetic_path:
+            if load_diffusion:
+                assert self.synthetic_path is not None, "Synthetic path must be specified for loading synthetic emnist"
                 print("Loading synthetic data from {}".format(self.synthetic_path))
                 # Load pre-generated synthetic dataset
-                synthetic_data = ImageFolder(self.synthetic_path, transform=self.test_transform)
+                synthetic_data = ImageFolder(self.synthetic_path, transform=self.synthetic_transform)
+                print("Synthetic data size: {}".format(len(synthetic_data)))
                 self.synthetic_dataset = self.balanced_split(synthetic_data, 10)
             else:
                 # Use EMNIST test set as synthetic dataset

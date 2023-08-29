@@ -13,6 +13,9 @@ from federated.Server import Server
 from models.Models import Models
 from knowledge_distillation import Logits, SoftTarget
 
+from federated.Diffusion import load_model
+from federated.diffusion_utils import sample
+
 class Scheduler:
 
     def __init__(self, 
@@ -81,7 +84,7 @@ class Scheduler:
         # Setup datasets
         self.dataset_id = dataset_id
         self.dataset = Dataset(data_path, dataset_id, batch_size, kd_batch_size, num_clients, synthetic_path)
-        self.dataset.prepare_data(data_partition)
+        self.dataset.prepare_data(data_partition, load_diffusion)
         # self.dataset.synthetic_dataset_test()
 
         # If single synthetic dataset
@@ -93,6 +96,11 @@ class Scheduler:
         # Assign devices to server and clients based on number of devices
         self.assign_devices()
 
+        # Loading Diffusion Model
+        self.diffusion_model = None
+        if load_diffusion == False:
+            self.init_DM(synthetic_path)
+
         # Setup server and initialize
         self.server = Server(self.server_device, self.server_model(), self.dataset_id, self.training_params, self.checkpoint_path, self.logger)
         # self.server.init_server(self.synthetic_dataset, pre_train=True)
@@ -101,6 +109,15 @@ class Scheduler:
         # Setup clients and initialize
         self.setup_clients()
         self.init_clients()
+
+    def init_DM(self, synthetic_path):
+        # Load Diffusion Model weights
+        checkpoint = torch.load(synthetic_path)
+
+        # Initialize Diffusion Model
+        self.diffusion_model = load_model(1)
+        self.diffusion_model.load_state_dict(checkpoint)
+        self.diffusion_model.to("cuda:0")
 
     def assign_devices(self):
         """
@@ -186,7 +203,11 @@ class Scheduler:
             self.round += 1
             logit_arr.clear()
 
-            synthetic_dataset = self.dataset.get_synthetic_data(round)
+            if self.load_diffusion:
+                synthetic_dataset = self.dataset.get_synthetic_data(round)
+            else:
+                seed = random.randint(0, 100000)
+                synthetic_dataset = self.sample_DM(seed)
 
             # Generate server logit
             # if self.load_diffusion:
@@ -469,3 +490,23 @@ class Scheduler:
         for client in self.clients:
             client.save_checkpoint()
         self.server.save_checkpoint()
+
+    def sample_DM(self, seed): 
+        # model = load_model(1)
+        # checkpoint = torch.load("../checkpoints/20230825-164926/model_100.pth")
+        # model.load_state_dict(checkpoint)
+        # model.to("cuda:0")
+        total_samples = 10000
+        num_samples = 10000
+        num_channels = 1
+        steps = 500
+        eta = 1.
+        device = "cuda:0"
+        #for i in range(1):
+        noise = torch.randn(num_samples, num_channels, 32, 32).to(device)
+        fakes_classes = torch.arange(10, device=device).repeat_interleave(num_samples // 10, 0)
+        fakes = sample(self.diffusion_model, noise, steps, eta, fakes_classes)
+
+        synthetic_loader = DataLoader(TensorDataset(fakes, fakes_classes), batch_size=self.kd_batch_size, shuffle=False)
+
+        return synthetic_loader
