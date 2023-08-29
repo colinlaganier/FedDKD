@@ -492,21 +492,23 @@ class Scheduler:
         self.server.save_checkpoint()
 
     def sample_DM(self, seed): 
-        # model = load_model(1)
-        # checkpoint = torch.load("../checkpoints/20230825-164926/model_100.pth")
-        # model.load_state_dict(checkpoint)
-        # model.to("cuda:0")
-        total_samples = 10000
+        # Store current seed and set new seed
+        current_seed = torch.seed()
+        torch.manual_seed(seed)
+
         num_samples = 10000
         num_channels = 1
         steps = 500
         eta = 1.
         device = "cuda:0"
-        #for i in range(1):
+
         noise = torch.randn(num_samples, num_channels, 32, 32).to(device)
         fakes_classes = torch.arange(10, device=device).repeat_interleave(num_samples // 10, 0)
         fakes = sample(self.diffusion_model, noise, steps, eta, fakes_classes)
 
         synthetic_loader = DataLoader(TensorDataset(fakes, fakes_classes), batch_size=self.kd_batch_size, shuffle=False)
+
+        # Reset seed
+        torch.manual_seed(current_seed)
 
         return synthetic_loader
