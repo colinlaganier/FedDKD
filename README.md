@@ -4,6 +4,8 @@
 ![Github](https://img.shields.io/badge/status-under_development-yellow)
 
 Master's Dissertation supervised by Dr. Zhongguo Li
+    
+![MQTT_Diagram](./figures/FedDKD_client.png)
 
 ## Abstract
 
