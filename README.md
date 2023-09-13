@@ -1,4 +1,4 @@
-# FedKDD: Federated Learning with Diffusion-based Knowledge Distillation in Heterogeneous Networks
+# FedDKD: Federated Learning with Diffusion-based Knowledge Distillation in Heterogeneous Networks
 
 ![GitHub](https://img.shields.io/github/license/colinlaganier/FedKDD)
 ![Github](https://img.shields.io/badge/status-under_development-yellow)
