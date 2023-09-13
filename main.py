@@ -97,11 +97,9 @@ if __name__ == "__main__":
 
     # Check if CUDA is available
     assert torch.cuda.is_available(), "CUDA is not available"
-    # assert torch.cuda.device_count() >= args.num_clients, "Not enough GPUs available" #change
     torch.backends.cudnn.benchmark = False
 
     # Create tensorboard writer
-    # log_dir=f"runs/EMNIST_Real_iid_ResNet"
     logger = SummaryWriter()
 
     # Create checkpoint directory for run

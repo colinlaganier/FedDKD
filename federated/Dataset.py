@@ -20,20 +20,17 @@ class Dataset:
         self.client_dataloaders = []
         self.client_pretrain_dataloader = []
         self.test_dataloader = None
-        self.num_classes = 10 if (dataset_id == "cifar10") else 100
+        self.num_classes = 10
         self.synthetic_dataset = []
         self.server_synthetic_dataset = None
-        # self.diffusion
 
         # Dataset transforms
         self.mean, self.std = self.get_stats(dataset_id)
         self.image_size = self.get_image_size(dataset_id)
         if (dataset_id == "cinic10"):
             self.train_transform = transforms.Compose([
-                # transforms.Resize(32),
                 transforms.RandomCrop(self.image_size, padding=4),
                 transforms.RandomHorizontalFlip(),
-                # transforms.TrivialAugmentWide(),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=self.mean, std=self.std),
             ])
@@ -43,7 +40,8 @@ class Dataset:
                 lambda img: transforms.functional.hflip(img),
                 transforms.Resize(32),
                 transforms.ToTensor(),
-                transforms.Normalize([0.5], [0.5])])
+                transforms.Normalize([0.5], [0.5])]
+                )
             self.synthetic_transform = transforms.Compose([
                 transforms.ToTensor(),
                 lambda img: img[0,:,:].unsqueeze(0),
@@ -80,9 +78,8 @@ class Dataset:
     def get_image_size(self, dataset_id):
         if (dataset_id in ["cifar10", "cifar100", "cinic10"]):
             return 32   
-        elif dataset_id == "mnist":
-            return 28
-        
+        elif dataset_id == "emnist":
+            return 32
         
     def random_split(self, dataset, num_splits):
         """
@@ -176,6 +173,10 @@ class Dataset:
     def prepare_data(self, partition, load_diffusion):
         """
         Loads data from data_path and splits into client and test dataloader
+
+        Args:
+            partition (str): partition strategy for splitting training data
+            load_diffusion (bool): whether to load pre-generated synthetic data
         """
         
         if self.dataset_id == "emnist":
@@ -194,9 +195,10 @@ class Dataset:
                 synthetic_data = ImageFolder(self.synthetic_path, transform=self.synthetic_transform)
                 print("Synthetic data size: {}".format(len(synthetic_data)))
                 self.synthetic_dataset = self.balanced_split(synthetic_data, 10)
-            # else:
-            #     # Use EMNIST test set as synthetic dataset
-            #     self.synthetic_dataset = test_split[1:]
+                print("Synthetic dataset size per round: {}".format(len(self.synthetic_dataset[0])))
+            else:
+                # Use EMNIST test set as synthetic dataset
+                self.synthetic_dataset = test_split[1:]
 
         elif self.dataset_id == "cinic10":
             training_data = ImageFolder(self.data_path + "/train", transform=self.train_transform)
@@ -204,6 +206,17 @@ class Dataset:
 
             # Reduce test set to 10,000 images for consistency
             test_data = self.balanced_split(test_data, 9)[0]
+
+            if load_diffusion:
+                if self.synthetic_path is not None:
+                    print("Loading synthetic data from {}".format(self.synthetic_path))
+                    # Load pre-generated synthetic dataset
+                    synthetic_data = ImageFolder(self.synthetic_path, transform=self.test_transform)
+                    self.synthetic_dataset = self.balanced_split(synthetic_data, 10)
+                    print("Synthetic dataset size per round: {}".format(len(self.synthetic_dataset[0])))
+                else:
+                    synthetic_data = ImageFolder(self.data_path + "/valid", transform=self.test_transform)
+                    self.synthetic_dataset = self.balanced_split(synthetic_data, 9)
         
         # Split training data into client datasets based on partition strategy
         if (partition == "iid"):
@@ -224,53 +237,34 @@ class Dataset:
         # Create test dataloader
         self.test_dataloader = DataLoader(test_data, batch_size=self.batch_size, shuffle=False)
 
-    # def prepare_diffusion_data(self):
-    #     """
-    #     Loads data from data_path and splits into client dataloader
-    #     """
-    #     diffusion_data = ImageFolder(self.data_path + "/diffusion", transform=self.diffusion_transform)
-    #     self.diffusion_dataloader = DataLoader(diffusion_data, batch_size=self.batch_size, shuffle=True)
-
-    def set_synthetic_data(self):
-        self.synthetic_folder = self.data_path + "/synthetic"
-
     def get_synthetic_data(self, round=None):
         """
-        Loads synthetic data from synthetic_folder
+        Loads synthetic data based on round 
+
+        Args:
+            round (int): round number
+        Returns:
+            synthetic_dataloader (torch.utils.data.DataLoader): synthetic data loader
         """
         if self.dataset_id == "emnist":
             if round is None:
                 synthetic_data = self.synthetic_dataset[0]
             else:
                 if self.synthetic_path:
-                    round = round % 10
+                    round = round % 20
                 else: 
                     round = round % 3
                 synthetic_data = self.synthetic_dataset[round]
         else: 
             if round is None:
-                synthetic_data = ImageFolder(self.synthetic_path, transform=self.test_transform)
+                synthetic_data = self.synthetic_dataset[0]
             else:
-                num_partition = len(next(os.walk(self.synthetic_path))[1])
-                round = round % num_partition
-                synthetic_data = ImageFolder(self.synthetic_path + "/round_" + str(round), transform=self.test_transform)
+                if self.synthetic_path:
+                    round = round % 20
+                else:
+                    round = round % 9
+                synthetic_data = self.synthetic_dataset[round]
+
+        # Create synthetic dataloader
         synthetic_dataloader = DataLoader(synthetic_data, batch_size=self.kd_batch_size, shuffle=False)
         return synthetic_dataloader
-    
-    def get_synthetic_train(self):
-        synthetic_data = ImageFolder(self.synthetic_path + "/round_0", transform=self.train_transform)
-        synthetic_dataloader = DataLoader(synthetic_data, batch_size=self.batch_size, shuffle=True)
-        return synthetic_dataloader
-    
-    def synthetic_dataset_test(self):
-        num_partition = 18
-        synthetic_data = ImageFolder(self.synthetic_path, transform=self.test_transform)
-        synthetic_data = self.balanced_split(synthetic_data, num_partition)
-        for i in range(num_partition):
-            self.synthetic_dataset.append(DataLoader(synthetic_data[i], batch_size=self.kd_batch_size, shuffle=False))
-
-        self.server_synthetic_dataset = DataLoader(synthetic_data[0], batch_size=self.batch_size, shuffle=True)
-
-    def get_synthetic_dataset_test(self, round):
-        round = round % 18
-        return self.synthetic_dataset[round]

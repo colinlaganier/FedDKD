@@ -16,7 +16,7 @@ class ClientModelStrategy:
         return [model] * num_clients
     
     @staticmethod
-    def strategy_1(num_clients):
+    def resnet(num_clients):
         return [Models.ResNet18] * (num_clients // 2) + [Models.ResNet34] * (num_clients - (num_clients // 2))
     
     @staticmethod
@@ -30,6 +30,6 @@ class ClientModelStrategy:
     available = {"heterogeneous_random" : heterogeneous_random,
                  "homogeneous_random" : heterogeneous_random,
                  "homogenous" : homogenous,
-                 "strategy_1" : strategy_1,
+                 "resnet" : resnet,
                  "strategy_2" : strategy_2,
                  "cnn_1": cnn_1}

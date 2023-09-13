@@ -26,17 +26,14 @@ class Server:
         Initialize the server model training process
 
         Args:
+            synthetic_dataset (TensorDataset): synthetic diffusion data
             pre_train (bool): whether to pre-train the server model
         """
         print("Initializing server model")
         torch.manual_seed(self.seed)
 
-        # self.model = self.model(weights=None, num_classes=self.params["num_classes"])
         num_channels = 3 if self.dataset_id == "cinic10" else 1
         self.model = self.model(num_channels, self.params["num_classes"])
-        if torch.cuda.device_count() > 1: 
-            print("Using multiple GPUs")
-            self.model = nn.DataParallel(self.model)
         self.model.to(self.device)
         self.optimizer = self.params["optimizer"](self.model.parameters(),
                                                 lr=self.params["lr"], 
@@ -46,26 +43,6 @@ class Server:
 
         if pre_train:
             self.synthetic_train(synthetic_dataset)
-
-    def aggregate_logits(self, client_logits):
-        """
-        Aggregate client logits into a single tensor of average logits
-
-        Args:
-            client_logits (Queue): queue of client logits
-        """
-
-        num_clients = client_logits.qsize()
-        logit_sum = torch.zeros_like(client_logits.queue[0])
-        
-        # Aggregate client logits
-        while not client_logits.empty():
-            logit_sum += client_logits.get()
-        # torch.mean(torch.stack(local_logits[:idx] + local_logits[idx + 1:]), dim=0)
-
-        # Put average logit value  back into queue
-        client_logits.put(logit_sum / num_clients)
-        self.client_logits = client_logits
 
     def knowledge_distillation(self, client_logits, synthetic_data=None, diffusion_seed=None):
         """
@@ -83,7 +60,6 @@ class Server:
         self.round += 1
 
         client_logit = DataLoader(TensorDataset(client_logits), batch_size=self.params["kd_batch_size"], num_workers=4)
-        # optimizer = self.params["kd_optimizer"](self.model.parameters(), lr=self.params["kd_lr"], momentum=self.params["kd_momentum"])
 
         kd_criterion = self.params["kd_criterion"](self.params["kd_temperature"]).to(self.device)
         criterion = self.params["criterion"]().to(self.device)
@@ -116,61 +92,6 @@ class Server:
             self.logger.add_scalar("KD_Class_Loss/Server", cls_total_loss/len(synthetic_data), self.round * self.params["kd_epochs_server"] + epoch)
 
         self.logger.flush()
-        # del optimizer, kd_criterion, criterion
-
-
-    # def knowledge_distillation(self, synthetic_data=None, diffusion_seed=None):
-    #     """
-    #     Knowledge distillation from client logits to server model
-        
-    #     Args:
-    #         synthetic_data (TensorDataset): synthetic diffusion data
-    #         diffusion_seed (int): random seed for diffusion
-    #     """
-    #     if synthetic_data is None:
-    #         synthetic_data = self.synthetic_dataset
-
-    #     torch.manual_seed(self.seed)
-    #     self.model.train()
-    #     self.round += 1
-
-    #     while not self.client_logits.empty():
-    #         # client_logit = logit_queue.get()
-    #         client_logit = DataLoader(TensorDataset(self.client_logits.get()), batch_size=self.params["kd_batch_size"], num_workers=4)
-    #         optimizer = self.params["kd_optimizer"](self.model.parameters(), lr=self.params["kd_lr"], momentum=self.params["kd_momentum"])
-
-    #         kd_criterion = self.params["kd_criterion"](self.params["kd_temperature"]).to(self.device)
-    #         criterion = self.params["criterion"]().to(self.device)
-
-    #         for epoch in range(self.params["kd_epochs"]):
-    #             kd_total_loss = 0
-    #             cls_total_loss = 0
-
-    #             for batch_idx, ((data, target), logit) in enumerate(zip(synthetic_data, client_logit)):
-    #                 logit = logit[0]
-    #                 data, target, logit = data.to(self.device), target.to(self.device), logit.to(self.device)
-                    
-    #                 self.optimizer.zero_grad()
-                    
-    #                 output = self.model(data)
-
-    #                 # Compute loss
-    #                 kd_loss = kd_criterion(output, logit)
-    #                 cls_loss = criterion(output, target)
-    #                 loss = (1 - self.params["kd_alpha_server"]) * cls_loss + self.params["kd_alpha_server"] * kd_loss
-                    
-    #                 kd_total_loss += kd_loss.item()
-    #                 cls_total_loss += loss.item()
-
-    #                 loss.backward()
-    #                 optimizer.step()
-                
-    #             # Log statistics
-    #             self.logger.add_scalar("KD_Loss/Server", kd_total_loss/len(synthetic_data), self.round * self.params["kd_epochs"] + epoch)
-    #             self.logger.add_scalar("KD_Class_Loss/Server", cls_total_loss/len(synthetic_data), self.round * self.params["kd_epochs"] + epoch)
-
-    #         self.logger.flush()
-    #         del optimizer, kd_criterion, criterion
 
     def generate_logits(self, synthetic_data=None, diffusion_seed=None):
         """

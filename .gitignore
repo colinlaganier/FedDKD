@@ -3,6 +3,7 @@
 /dataset/cinic-10/
 /dataset/emnist/
 /diffusion/dataset/
+/diffusion/synthetic/
 /checkpoints/*
 !checkpoints/README.md
 /diffusion.orig

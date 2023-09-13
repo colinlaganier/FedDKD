@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-# from diffusion import DiT
 from knowledge_distillation import Logits, SoftTarget
 import numpy as np
 
@@ -19,18 +18,18 @@ class Client:
         self.dataset_id = dataset_id
 
         self.model = model
-        # self.model = deepcopy(model).to(self.gpu_id)
         self.criterion = None
         self.optimizer = None
         self.diffusion_model = None
         self.diffusion_seed = None  
         self.device = device
-        self.seed = None # random seed for training
         self.eval_seed = None
         self.synthetic_dataset = None
         self.epochs = None
         self.params = params
         self.kd_alpha = None
+
+        # Knowledge distillation strategy
         self.strategies = {
             0: self.constant,
             1: self.linear,
@@ -65,15 +64,13 @@ class Client:
     def init_client(self, load_checkpoint=False):
         """
         Initialize the client model training process
+
+        Args:
+            load_checkpoint (bool): whether to load a pretrained checkpoint
         """
-        # torch.manual_seed(self.seed)
         print(f"Initializing client {self.id}")
-
-        # Log model properties
-        # self.logger.add_text()
-
+        
         torch.manual_seed(self.id)
-        # self.model = self.model(weights=None, num_classes=self.params["num_classes"])
         num_channels = 3 if self.dataset_id == "cinic10" else 1
         self.model = self.model(num_channels, self.params["num_classes"])
         if torch.cuda.device_count() > 1:
@@ -87,8 +84,7 @@ class Client:
                                              )
         self.criterion = self.params["criterion"]().to(self.device)
         if load_checkpoint:
-            self.load_checkpoint(f"checkpoints/pretrain/client_0{self.id}.pt")
-            # self.train(epochs=1)
+            self.load_checkpoint(f"checkpoints/pretrain/cinic10/iid/resnet/client_0{self.id}.pt")
         else:
             print(self.params["pretrain_epochs"])
             self.train(epochs=self.params["pretrain_epochs"])
@@ -96,8 +92,10 @@ class Client:
     def train(self, epochs=None):
         """
         Train the client model
+
+        Args:
+            epochs (int): number of epochs to train for
         """
-        # self.model.to(self.device) 
         torch.manual_seed(self.id)
         self.model.train()
         self.round += 1
@@ -105,7 +103,7 @@ class Client:
         num_epochs = epochs if epochs else self.params["epochs"]
 
         for epoch in range(num_epochs):
-                    # Set statistic variables
+            # Set statistic variables
             total_loss = 0
             total_correct = 0
             total = 0
@@ -133,8 +131,6 @@ class Client:
             self.logger.add_scalar(f"Training_Loss/Client_{self.id:02}", total_loss/len(self.dataloader), (self.round - 1) * self.params["epochs"] + epoch + self.params["pretrain_epochs"])
             self.logger.add_scalar(f"Training_Accuracy/Client_{self.id:02}", 100*total_correct/total, (self.round - 1) * self.params["epochs"] + epoch + self.params["pretrain_epochs"])
 
-        # if self.round == 0:
-        #     self.save_checkpoint("checkpoints/pretrain")
         
         self.logger.flush()
 
@@ -152,12 +148,10 @@ class Client:
         if synthetic_data is None:
             synthetic_data = self.synthetic_dataset
         
+        # Set client seed for consistency
         torch.manual_seed(self.id)
 
-        # self.model.to(self.device)
         self.model.train()
-
-        # optimizer = self.params["kd_optimizer"](self.model.parameters(), lr=self.params["kd_lr"], momentum=self.params["kd_momentum"])
 
         kd_criterion = self.params["kd_criterion"](self.params["kd_temperature"]).to(self.device)
         criterion = self.params["criterion"]().to(self.device)
@@ -185,19 +179,13 @@ class Client:
 
                 kd_loss = kd_criterion(output, logit)
                 cls_loss = criterion(output, target)
-                loss = (1 - self.params["kd_alpha"]) * cls_loss + self.params["kd_alpha"] * kd_loss
                 
                 # Knowledge distillation alpha scheduling
                 if self.kd_scheduling is not None: 
                     alpha = self.get_alpha()
                     loss = (1 - alpha) * cls_loss + alpha * kd_loss
-
-
-                # Adaptive loss
-                # max_loss = torch.max(cls_loss, kd_loss)
-                # min_loss = torch.min(cls_loss, kd_loss)
-                # loss_sum = cls_loss + kd_loss
-                # loss = (max_loss / loss_sum) * cls_loss + (min_loss / loss_sum) * kd_loss
+                else:
+                    loss = (1 - self.params["kd_alpha"]) * cls_loss + self.params["kd_alpha"] * kd_loss
 
                 kd_total_loss += kd_loss.item()
                 cls_total_loss += loss.item()
@@ -211,71 +199,6 @@ class Client:
 
         self.logger.flush()
         # del optimizer, kd_criterion, criterion
-
-
-    def train_kd(self, teacher_logits, synthetic_data=None, diffusion_seed=None):
-        torch.manual_seed(self.id)
-        self.model.train()
-        self.round += 1
-
-        kd_criterion = self.params["kd_criterion"](self.params["kd_temperature"]).to(self.device)
-        
-        for epoch in range(self.params["epochs"]):
-            # Set statistic variables
-            kd_total_loss = 0
-            cls_total_loss = 0
-            total_loss = 0
-            total_correct = 0
-            total = 0
-            for batch_idx, ((local_data, local_target), (kd_data, kd_target), logit) in enumerate(zip(self.dataloader, synthetic_data, teacher_logits)):
-                # Send data and target to device
-                local_data, local_target = local_data.to(self.device), local_target.to(self.device)
-                logit = logit[0]
-                kd_data, kd_target, logit = kd_data.to(self.device), kd_target.to(self.device), logit.to(self.device)
-
-                # Forward pass
-                # Local data training
-                local_output = self.model(local_data)
-                local_loss = self.criterion(local_output, local_target)
-
-                # Synthetic data knowledge distillation
-                kd_output = self.model(kd_data)
-                kd_loss = kd_criterion(kd_output, logit)
-                kd_cls_loss = self.criterion(kd_output, kd_target)
-                
-                # Adaptive knowledge distillation loss
-                # max_loss = torch.max(local_loss, kd_loss)
-                # min_loss = torch.min(local_loss, kd_loss)
-                # loss_sum = local_loss + kd_loss
-                # loss = (max_loss / loss_sum) * local_loss + (min_loss / loss_sum) * kd_loss
-                
-                # Knowledge distillation alpha scheduling
-                if self.kd_scheduling is not None: 
-                    alpha = self.get_alpha()
-                    loss = (1 - alpha) * local_loss + alpha * kd_loss
-                else:
-                    loss = (1 - self.params["kd_alpha"]) * local_loss + self.params["kd_alpha"] * kd_loss
-                    # loss = (1 - self.params["kd_alpha"]) * local_loss + self.params["kd_alpha"] * kd_loss
-
-                # Zero out gradients
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
-
-                total += local_target.size(0)
-                total_loss += local_loss.item()
-                _, predicted = torch.max(local_output.data, 1)
-                total_correct += (predicted == local_target).sum().item()
-                kd_total_loss += kd_loss.item()
-                cls_total_loss += kd_cls_loss.item()
-
-            # Log statistics
-            self.logger.add_scalar(f"Training_Loss/Client_{self.id:02}", total_loss/len(self.dataloader), self.round * self.params["epochs"] + epoch)
-            self.logger.add_scalar(f"Training_Accuracy/Client_{self.id:02}", 100*total_correct/total, self.round * self.params["epochs"] + epoch)
-            self.logger.add_scalar(f"KD_Loss/Client_{self.id:02}", kd_total_loss/len(synthetic_data), self.round * self.params["kd_epochs"] + epoch)
-            self.logger.add_scalar(f"KD_Class_Loss/Client_{self.id:02}", cls_total_loss/len(synthetic_data), self.round * self.params["kd_epochs"] + epoch)
-
-        self.logger.flush()
 
     def generate_logits(self, synthetic_data=None, diffusion_seed=None):
         """
